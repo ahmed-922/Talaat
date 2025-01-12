@@ -37,7 +37,14 @@ export default function TabLayout() {
         name="newTask"
         options={{
           title: 'New Task',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="paperplane.fill" color={color} />,
+          tabBarIcon: ({ color }) => <IconSymbol name="plussquareo" size={24} color="black" />,
+        }}
+      />
+      <Tabs.Screen
+        name="user"
+        options={{
+          title: 'User',
+          tabBarIcon: ({ color }) => <IconSymbol size={28} name="person.fill" color={color} />,
         }}
       />
     </Tabs>
