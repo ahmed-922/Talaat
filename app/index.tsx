@@ -1,29 +1,46 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Text, View, StyleSheet, TextInput, Button, Alert } from 'react-native';
-import { useRouter, Link } from 'expo-router'; // Import useRouter for navigation
+import { Link, useRouter } from 'expo-router'; // Import useRouter for navigation
+import { signInWithEmailAndPassword } from 'firebase/auth';
+import { auth } from '../firebaseConfig'; // Adjust the path as necessary
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function Login() {
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const router = useRouter(); // Use router for navigation
 
+  useEffect(() => {
+    const checkUser = async () => {
+      const user = await AsyncStorage.getItem('user');
+      if (user) {
+        router.push('/home');
+      }
+    };
+    checkUser();
+  }, []);
+
   const handleLogin = () => {
-    if (username === 'admin' && password === '123') {
-      Alert.alert('Login successful!', 'Redirecting to home page...');
-      router.push('/home'); // Navigate to the Home screen
-    } else {
-      Alert.alert('Error', 'Invalid username or password');
-    }
+    signInWithEmailAndPassword(auth, email, password)
+      .then(async (userCredential) => {
+        await AsyncStorage.setItem('user', JSON.stringify(userCredential.user));
+        Alert.alert('Login successful!', 'Redirecting to home page...');
+        router.push('/home'); // Navigate to the Home screen
+      })
+      .catch((error) => {
+        Alert.alert('Error', error.message);
+      });
   };
 
   return (
     <View style={styles.container}>
-      <Text style={styles.label}>Username</Text>
+      <Text style={styles.label}>Email</Text>
       <TextInput
         style={styles.input}
-        placeholder="Enter your username"
-        value={username}
-        onChangeText={setUsername}
+        placeholder="Enter your email"
+        keyboardType="email-address"
+        value={email}
+        onChangeText={setEmail}
       />
 
       <Text style={styles.label}>Password</Text>
