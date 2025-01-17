@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, FlatList, StyleSheet } from 'react-native';
 import { collection, getDocs } from 'firebase/firestore';
-import { db } from './../../firebaseConfig';
+import { db } from '../../firebaseConfig';
+import { Link } from 'expo-router';
 
 export const HEADER_HEIGHT = 100;
 
@@ -42,7 +43,9 @@ export default function TaskList() {
         keyExtractor={item => item.id}
       />
     </View>
+
   );
+ 
 }
 
 const styles = StyleSheet.create({
@@ -58,5 +61,12 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 18,
     fontWeight: 'bold',
+  },
+  button: {
+    backgroundColor: 'blue',
+    color: 'white',
+    padding: 10,
+    textAlign: 'center',
+    marginTop: 10,
   },
 });

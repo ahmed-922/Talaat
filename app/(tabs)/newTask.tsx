@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, TextInput, Button, StyleSheet } from 'react-native';
 import { collection, addDoc } from 'firebase/firestore';
 import { db } from '../../firebaseConfig';
-import { HEADER_HEIGHT } from '.';
+import { HEADER_HEIGHT } from './home';
 
 export default function NewTask() {
   const [title, setTitle] = useState('');
