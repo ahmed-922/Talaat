@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, StyleSheet } from 'react-native';
+import { View, Text, FlatList, StyleSheet, TouchableOpacity } from 'react-native';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../../firebaseConfig';
-
+import { Link } from 'expo-router';
 
 export const HEADER_HEIGHT = 100;
 
@@ -27,12 +27,14 @@ export default function TaskList() {
   }, []);
 
   const renderItem = ({ item }) => (
-    <View style={styles.taskItem}>
-      <Text style={styles.title}>{item.title}</Text>
-      <Text>{item.description}</Text>
-      <Text>Price: {item.price}</Text>
-      <Text>Duration: {item.duration}</Text>
-    </View>
+    <Link href={{ pathname: 'TaskDetails', params: { task: JSON.stringify(item) } }} style={styles.link}>
+      <View style={styles.taskItem}>
+        <Text style={styles.title}>{item.title}</Text>
+        <Text>{item.description}</Text>
+        <Text>Price: {item.price}</Text>
+        <Text>Duration: {item.duration}</Text>
+      </View>
+    </Link>
   );
 
   return (
@@ -43,9 +45,7 @@ export default function TaskList() {
         keyExtractor={item => item.id}
       />
     </View>
-
   );
- 
 }
 
 const styles = StyleSheet.create({
@@ -62,11 +62,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
   },
-  button: {
-    backgroundColor: 'blue',
-    color: 'white',
-    padding: 10,
-    textAlign: 'center',
-    marginTop: 10,
+  link: {
+    textDecorationLine: 'none',
   },
 });

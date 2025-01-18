@@ -1,4 +1,4 @@
-uniqueimport React, { useState } from 'react';
+import React, { useState } from 'react';
 import { Text, View, StyleSheet, TextInput, Button, Alert } from 'react-native';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { collection, query, where, getDocs, addDoc } from 'firebase/firestore';
