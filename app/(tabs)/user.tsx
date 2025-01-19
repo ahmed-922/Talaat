@@ -22,7 +22,7 @@ export default function UserProfile() {
         fetchUserProfile(currentUser.uid);
         fetchUserTasks(currentUser.uid);
       } else {
-        router.push('./index');
+       console.log('User is not logged in');
       }
     });
 
@@ -62,7 +62,7 @@ export default function UserProfile() {
   const handleLogout = async () => {
     await signOut(auth);
     await AsyncStorage.removeItem('user');
-    router.push('./index');
+    console.log('User is logged out');
   };
 
   return (

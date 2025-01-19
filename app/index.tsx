@@ -1,36 +1,66 @@
 import React, { useState, useEffect } from 'react';
-import { Text, View, StyleSheet, TextInput, Button, Alert } from 'react-native';
-import { Link, useRouter } from 'expo-router'; // Import useRouter for navigation
-import { signInWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '../firebaseConfig'; // Adjust the path as necessary
+import { Text, View, StyleSheet, TextInput, Button, Alert, ActivityIndicator } from 'react-native';
+import { Link, useRouter } from 'expo-router';
+import { getAuth, signInWithEmailAndPassword, onAuthStateChanged } from 'firebase/auth';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const SplashScreen = ({ onAuthCheckComplete }: { onAuthCheckComplete: () => void }) => {
+  const router = useRouter();
+  const auth = getAuth();
+
+  useEffect(() => {
+    const checkAuthentication = async () => {
+      const user = auth.currentUser;
+      if (user) {
+        router.push('/home');
+      } else {
+        onAuthCheckComplete();
+      }
+    };
+    checkAuthentication();
+  }, []);
+
+  return (
+    <View style={styles.container}>
+      <ActivityIndicator size="large" color="#0000ff" />
+      <Text style={styles.text}>Loading...</Text>
+    </View>
+  );
+};
 
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const router = useRouter(); // Use router for navigation
+  const [loading, setLoading] = useState(true);
+  const router = useRouter();
+  const auth = getAuth();
 
   useEffect(() => {
-    const checkUser = async () => {
-      const user = await AsyncStorage.getItem('user');
+    const listener = onAuthStateChanged(auth, (user) => {
       if (user) {
         router.push('/home');
+      } else {
+        setLoading(false);
       }
+    });
+
+    return () => {
+      listener();
     };
-    checkUser();
   }, []);
 
-  const handleLogin = () => {
-    signInWithEmailAndPassword(auth, email, password)
-      .then(async (userCredential) => {
-        await AsyncStorage.setItem('user', JSON.stringify(userCredential.user));
-        Alert.alert('Login successful!', 'Redirecting to home page...');
-        router.push('/home'); // Navigate to the Home screen
-      })
-      .catch((error) => {
-        Alert.alert('Error', error.message);
-      });
+  const handleLogin = async () => {
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+      router.push('/home');
+    } catch (error: any) {
+      Alert.alert('Error', error.message);
+    }
   };
+
+  if (loading) {
+    return <SplashScreen onAuthCheckComplete={() => setLoading(false)} />;
+  }
 
   return (
     <View style={styles.container}>
@@ -67,6 +97,8 @@ export default function Login() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
     padding: 16,
   },
   label: {
@@ -79,20 +111,22 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     marginBottom: 12,
     paddingHorizontal: 8,
+    width: '100%',
   },
   signupContainer: {
     position: 'absolute',
     bottom: 16,
-    left: 16,
+    alignItems: 'center',
   },
   signupLabel: {
     fontSize: 14,
   },
   button: {
-    backgroundColor: 'blue',
-    color: 'white',
-    padding: 10,
-    textAlign: 'center',
-    marginTop: 10,
+    color: 'blue',
+  },
+  text: {
+    marginTop: 20,
+    fontSize: 18,
+    fontWeight: 'bold',
   },
 });
