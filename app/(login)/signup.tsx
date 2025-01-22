@@ -1,13 +1,17 @@
 import React, { useState } from 'react';
-import { Text, View, StyleSheet, TextInput, Button, Alert } from 'react-native';
+import { Text, View, StyleSheet, TextInput, Button, Alert, Animated } from 'react-native';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { collection, query, where, getDocs, addDoc } from 'firebase/firestore';
 import { auth, db } from '../../firebaseConfig'; // Adjust the path as necessary
+import { ImageBackground } from 'react-native'; // Import ImageBackground
 
 export default function Signup() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [username, setUsername] = useState('');
+  const [usernameLabelAnim] = useState(new Animated.Value(0));
+  const [emailLabelAnim] = useState(new Animated.Value(0));
+  const [passwordLabelAnim] = useState(new Animated.Value(0));
 
   const handleSignup = async () => {
     try {
@@ -33,57 +37,155 @@ export default function Signup() {
 
       Alert.alert('User registered successfully!');
     } catch (error) {
-      Alert.alert(error.message);
+      Alert.alert('Error', error.message);
     }
   };
 
+  const animateLabel = (animValue, toValue) => {
+    Animated.timing(animValue, {
+      toValue,
+      duration: 200,
+      useNativeDriver: false,
+    }).start();
+  };
+
   return (
-    <View style={styles.container}>
-      <Text style={styles.label}>Username</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="Enter your username"
-        value={username}
-        onChangeText={setUsername}
-      />
+    <ImageBackground
+      source={{ uri: 'https://letsenhance.io/static/8f5e523ee6b2479e26ecc91b9c25261e/1015f/MainAfter.jpg' }} 
+      style={styles.background}
+    >
+      <View style={styles.box}>
+        <View style={styles.inputContainer}>
+          <Animated.Text
+            style={[
+              styles.label,
+              {
+                top: usernameLabelAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [11, -10],
+                }),
+                opacity: usernameLabelAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0.5, 1],
+                }),
+              },
+            ]}
+          >
+            Username
+          </Animated.Text>
+          <TextInput
+            style={styles.input}
+            placeholder=""
+            value={username}
+            onChangeText={setUsername}
+            onFocus={() => animateLabel(usernameLabelAnim, 1)}
+            onBlur={() => {
+              if (!username) animateLabel(usernameLabelAnim, 0);
+            }}
+          />
+        </View>
 
-      <Text style={styles.label}>Email</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="Enter your email"
-        keyboardType="email-address"
-        value={email}
-        onChangeText={setEmail}
-      />
+        <View style={styles.inputContainer}>
+          <Animated.Text
+            style={[
+              styles.label,
+              {
+                top: emailLabelAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [11, -10],
+                }),
+                opacity: emailLabelAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0.5, 1],
+                }),
+              },
+            ]}
+          >
+            Email
+          </Animated.Text>
+          <TextInput
+            style={styles.input}
+            placeholder=""
+            keyboardType="email-address"
+            value={email}
+            onChangeText={setEmail}
+            onFocus={() => animateLabel(emailLabelAnim, 1)}
+            onBlur={() => {
+              if (!email) animateLabel(emailLabelAnim, 0);
+            }}
+          />
+        </View>
 
-      <Text style={styles.label}>Password</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="Enter your password"
-        secureTextEntry
-        value={password}
-        onChangeText={setPassword}
-      />
+        <View style={styles.inputContainer}>
+          <Animated.Text
+            style={[
+              styles.label,
+              {
+                top: passwordLabelAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [11, -10],
+                }),
+                opacity: passwordLabelAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0.5, 1],
+                }),
+              },
+            ]}
+          >
+            Password
+          </Animated.Text>
+          <TextInput
+            style={styles.input}
+            placeholder=""
+            secureTextEntry
+            value={password}
+            onChangeText={setPassword}
+            onFocus={() => animateLabel(passwordLabelAnim, 1)}
+            onBlur={() => {
+              if (!password) animateLabel(passwordLabelAnim, 0);
+            }}
+          />
+        </View>
 
-      <Button title="Sign Up" onPress={handleSignup} />
-    </View>
+        <Button title="Signup" onPress={handleSignup} />
+      </View>
+    </ImageBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  background: {
     flex: 1,
-    padding: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  box: {
+    width: '80%',
+    padding: 20,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)', // Semi-transparent white background
+    borderColor: 'rgba(255, 255, 255, 0.5)', // White border with 50% opacity
+    borderWidth: 1,
+    backdropFilter: 'blur(10px)', // Blur effect
+  },
+  inputContainer: {
+    position: 'relative',
+    marginBottom: 20,
   },
   label: {
+    position: 'absolute',
+    left: 10,
     fontSize: 16,
     fontWeight: 'bold',
+    backgroundColor: 'rgba(255, 255, 255, 0)', // Match the box background
+    paddingHorizontal: 5,
   },
   input: {
     height: 40,
     borderColor: 'gray',
-    borderWidth: 1,
-    marginBottom: 12,
+    borderBottomWidth: 1, // Rounded corners
+    borderRadius: 20, // More rounded corners
     paddingHorizontal: 8,
+    width: '100%',
   },
 });

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, Button, StyleSheet } from 'react-native';
+import { View, Text, TextInput, Button, StyleSheet, useColorScheme } from 'react-native';
 import { collection, addDoc } from 'firebase/firestore';
 import { db } from '../../firebaseConfig';
 import { HEADER_HEIGHT } from './home';
@@ -9,6 +9,7 @@ export default function NewTask() {
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState('');
   const [duration, setDuration] = useState('');
+  const colorScheme = useColorScheme();
 
   const handleSubmit = async () => {
     try {
@@ -24,43 +25,45 @@ export default function NewTask() {
     }
   };
 
+  const themeTextStyle = colorScheme === 'light' ? styles.lightThemeText : styles.darkThemeText;
+  const themeContainerStyle = colorScheme === 'light' ? styles.lightContainer : styles.darkContainer;
+
   return (
-    <View style={styles.container}>
-    <View style={styles.header} />
-      <Text style={styles.label}>Title</Text>
+    <View style={[styles.container, themeContainerStyle]}>
+      <View style={styles.header} />
+      <Text style={[styles.label, themeTextStyle]}>Title</Text>
       <TextInput
-        style={styles.input}
+        style={[styles.input, themeTextStyle]}
         value={title}
         onChangeText={setTitle}
         placeholder="Enter task title"
+        placeholderTextColor={colorScheme === 'light' ? '#242c40' : '#d0d0c0'}
       />
-
-      <Text style={styles.label}>Description</Text>
+      <Text style={[styles.label, themeTextStyle]}>Description</Text>
       <TextInput
-        style={styles.input}
+        style={[styles.input, themeTextStyle]}
         value={description}
         onChangeText={setDescription}
         placeholder="Enter task description"
+        placeholderTextColor={colorScheme === 'light' ? '#242c40' : '#d0d0c0'}
       />
-
-      <Text style={styles.label}>Price Tag</Text>
+      <Text style={[styles.label, themeTextStyle]}>Price</Text>
       <TextInput
-        style={styles.input}
+        style={[styles.input, themeTextStyle]}
         value={price}
         onChangeText={setPrice}
-        placeholder="Enter price tag"
-        keyboardType="numeric"
+        placeholder="Enter task price"
+        placeholderTextColor={colorScheme === 'light' ? '#242c40' : '#d0d0c0'}
       />
-
-      <Text style={styles.label}>Task Duration</Text>
+      <Text style={[styles.label, themeTextStyle]}>Duration</Text>
       <TextInput
-        style={styles.input}
+        style={[styles.input, themeTextStyle]}
         value={duration}
         onChangeText={setDuration}
         placeholder="Enter task duration"
+        placeholderTextColor={colorScheme === 'light' ? '#242c40' : '#d0d0c0'}
       />
-
-      <Button title="Create Task" onPress={handleSubmit} />
+      <Button title="Add Task" onPress={handleSubmit} />
     </View>
   );
 }
@@ -68,21 +71,34 @@ export default function NewTask() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 16,
+    padding: 20,
+  },
+  header: {
+    height: HEADER_HEIGHT,
   },
   label: {
-    fontSize: 16,
+    fontSize: 18,
+    fontWeight: 'bold',
     marginBottom: 8,
   },
   input: {
     height: 40,
     borderColor: 'gray',
     borderWidth: 1,
-    marginBottom: 16,
+    borderRadius: 10,
     paddingHorizontal: 8,
+    marginBottom: 16,
   },
-  header: {
-    height: HEADER_HEIGHT,
-    overflow: 'hidden',
+  lightContainer: {
+    backgroundColor: '#d0d0c0',
+  },
+  darkContainer: {
+    backgroundColor: '#0A0A0A',
+  },
+  lightThemeText: {
+    color: '#242c40',
+  },
+  darkThemeText: {
+    color: '#E6E8E9',
   },
 });

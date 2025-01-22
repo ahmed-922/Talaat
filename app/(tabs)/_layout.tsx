@@ -1,7 +1,6 @@
 import { Tabs } from 'expo-router';
 import React from 'react';
 import { Platform } from 'react-native';
-
 import { HapticTab } from '@/components/HapticTab';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import TabBarBackground from '@/components/ui/TabBarBackground';
@@ -37,7 +36,7 @@ export default function TabLayout() {
         name="newTask"
         options={{
           title: 'New Task',
-          tabBarIcon: ({ color }) => <IconSymbol name="plussquareo" size={24} color="black" />,
+          tabBarIcon: ({ color }) => <IconSymbol name="plus.app" size={24} color={color} />,
         }}
       />
       <Tabs.Screen

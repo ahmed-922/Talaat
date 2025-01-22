@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, FlatList, useColorScheme, StyleSheet } from 'react-native';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../../firebaseConfig';
 import { Link } from 'expo-router';
@@ -8,6 +8,7 @@ export const HEADER_HEIGHT = 100;
 
 export default function TaskList() {
   const [tasks, setTasks] = useState([]);
+  const colorScheme = useColorScheme();
 
   useEffect(() => {
     const fetchTasks = async () => {
@@ -28,17 +29,21 @@ export default function TaskList() {
 
   const renderItem = ({ item }) => (
     <Link href={{ pathname: 'TaskDetails', params: { task: JSON.stringify(item) } }} style={styles.link}>
-      <View style={styles.taskItem}>
-        <Text style={styles.title}>{item.title}</Text>
-        <Text>{item.description}</Text>
-        <Text>Price: {item.price}</Text>
-        <Text>Duration: {item.duration}</Text>
+      <View style={[styles.taskItem, themeContainerStyle] }>
+        <Text style={[styles.title, themeTextStyle]}>{item.title}</Text>
+        <Text  style={[themeTextStyle]}>{item.description}</Text>
+        <Text  style={[themeTextStyle]}>Price: {item.price}</Text>
+        <Text  style={[themeTextStyle]}>Duration: {item.duration}</Text>
       </View>
     </Link>
   );
 
+  const themeTextStyle = colorScheme === 'light' ? styles.lightThemeText : styles.darkThemeText;
+  const themeContainerStyle = colorScheme === 'light' ? styles.lightContainer : styles.darkContainer;
+
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, themeContainerStyle]}>
+       <View style={styles.header} />
       <FlatList
         data={tasks}
         renderItem={renderItem}
@@ -51,12 +56,17 @@ export default function TaskList() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 16,
+  },
+  header: { 
+    height: HEADER_HEIGHT,
   },
   taskItem: {
-    padding: 16,
-    borderBottomWidth: 1,
+    padding: 20,
+    marginVertical: 8,
+    marginHorizontal: 16,
+    borderWidth: 1,
     borderBottomColor: '#ccc',
+    width: '100%',
   },
   title: {
     fontSize: 18,
@@ -64,5 +74,17 @@ const styles = StyleSheet.create({
   },
   link: {
     textDecorationLine: 'none',
+  },
+  lightContainer: {
+    backgroundColor: '#d0d0c0',
+  },
+  darkContainer: {
+    backgroundColor: '#0A0A0A',
+  },
+  lightThemeText: {
+    color: '#242c40',
+  },
+  darkThemeText: {
+    color: '#E6E8E9',
   },
 });
