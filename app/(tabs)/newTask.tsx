@@ -1,14 +1,16 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, Button, StyleSheet, useColorScheme } from 'react-native';
+import { View, Text, TextInput, Button, StyleSheet, ScrollView, KeyboardAvoidingView, ImageBackground, useColorScheme } from 'react-native';
 import { collection, addDoc } from 'firebase/firestore';
 import { db } from '../../firebaseConfig';
-import { HEADER_HEIGHT } from './home';
+
+export const HEADER_HEIGHT = 100;
 
 export default function NewTask() {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState('');
   const [duration, setDuration] = useState('');
+  const [skills, setSkills] = useState('');
   const colorScheme = useColorScheme();
 
   const handleSubmit = async () => {
@@ -18,6 +20,7 @@ export default function NewTask() {
         description,
         price,
         duration,
+        skills,
       });
       console.log('Task added successfully');
     } catch (e) {
@@ -25,80 +28,153 @@ export default function NewTask() {
     }
   };
 
-  const themeTextStyle = colorScheme === 'light' ? styles.lightThemeText : styles.darkThemeText;
-  const themeContainerStyle = colorScheme === 'light' ? styles.lightContainer : styles.darkContainer;
+  const themeCardStyle =
+    colorScheme === 'light'
+      ? styles.lightCard
+      : styles.darkCard;
+
+  const themeTextStyle =
+    colorScheme === 'light'
+      ? styles.lightThemeText
+      : styles.darkThemeText;
 
   return (
-    <View style={[styles.container, themeContainerStyle]}>
-      <View style={styles.header} />
-      <Text style={[styles.label, themeTextStyle]}>Title</Text>
-      <TextInput
-        style={[styles.input, themeTextStyle]}
-        value={title}
-        onChangeText={setTitle}
-        placeholder="Enter task title"
-        placeholderTextColor={colorScheme === 'light' ? '#242c40' : '#d0d0c0'}
-      />
-      <Text style={[styles.label, themeTextStyle]}>Description</Text>
-      <TextInput
-        style={[styles.input, themeTextStyle]}
-        value={description}
-        onChangeText={setDescription}
-        placeholder="Enter task description"
-        placeholderTextColor={colorScheme === 'light' ? '#242c40' : '#d0d0c0'}
-      />
-      <Text style={[styles.label, themeTextStyle]}>Price</Text>
-      <TextInput
-        style={[styles.input, themeTextStyle]}
-        value={price}
-        onChangeText={setPrice}
-        placeholder="Enter task price"
-        placeholderTextColor={colorScheme === 'light' ? '#242c40' : '#d0d0c0'}
-      />
-      <Text style={[styles.label, themeTextStyle]}>Duration</Text>
-      <TextInput
-        style={[styles.input, themeTextStyle]}
-        value={duration}
-        onChangeText={setDuration}
-        placeholder="Enter task duration"
-        placeholderTextColor={colorScheme === 'light' ? '#242c40' : '#d0d0c0'}
-      />
-      <Button title="Add Task" onPress={handleSubmit} />
-    </View>
+    <ImageBackground
+      source={{
+        uri: 'https://letsenhance.io/static/8f5e523ee6b2479e26ecc91b9c25261e/1015f/MainAfter.jpg',
+      }}
+      style={styles.background}
+    >
+      <KeyboardAvoidingView style={styles.container} behavior="padding">
+        <ScrollView contentContainerStyle={styles.scrollView}>
+          <View style={[styles.card, themeCardStyle]}>
+            <Text style={[styles.header, themeTextStyle]}>
+              Post your task
+            </Text>
+            <Text style={[styles.label, themeTextStyle]}>
+              What will your task be?
+            </Text>
+            <TextInput
+              style={[styles.input, themeTextStyle]}
+              value={title}
+              onChangeText={setTitle}
+              placeholder="Enter task title"
+              placeholderTextColor={
+                colorScheme === 'light' ? '#242c40' : '#d0d0c0'
+              }
+            />
+            <Text style={[styles.label, themeTextStyle]}>
+              Give a brief description about your task
+            </Text>
+            <TextInput
+              style={[styles.input, themeTextStyle]}
+              value={description}
+              onChangeText={setDescription}
+              placeholder="Enter task description"
+              placeholderTextColor={
+                colorScheme === 'light' ? '#242c40' : '#d0d0c0'
+              }
+            />
+            <Text style={[styles.label, themeTextStyle]}>
+              Enter your price (BD will be added automatically)
+            </Text>
+            <TextInput
+              style={[styles.input, themeTextStyle]}
+              value={price}
+              onChangeText={setPrice}
+              placeholder="Enter task price"
+              placeholderTextColor={
+                colorScheme === 'light' ? '#242c40' : '#d0d0c0'
+              }
+              keyboardType="numeric"
+            />
+            <Text style={[styles.label, themeTextStyle]}>
+              How long will your task take?
+            </Text>
+            <TextInput
+              style={[styles.input, themeTextStyle]}
+              value={duration}
+              onChangeText={setDuration}
+              placeholder="Enter task duration"
+              placeholderTextColor={
+                colorScheme === 'light' ? '#242c40' : '#d0d0c0'
+              }
+            />
+            <Text style={[styles.label, themeTextStyle]}>
+              Enter required skills needed for this task
+            </Text>
+            <TextInput
+              style={[styles.input, themeTextStyle]}
+              value={skills}
+              onChangeText={setSkills}
+              placeholder="Enter task skills"
+              placeholderTextColor={
+                colorScheme === 'light' ? '#242c40' : '#d0d0c0'
+              }
+            />
+            <Button title="Submit" onPress={handleSubmit} />
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </ImageBackground>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  background: {
+    flex: 1,
+    resizeMode: 'cover',
+  },
+  scrollView: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  card: {
+    borderRadius: 10,
     padding: 20,
+    width: '100%',
+    height: '90%',
+    marginTop: 350,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.8,
+    shadowRadius: 2,
+    elevation: 5,
+    bottom: 0,
+  },
+  lightCard: {
+    backgroundColor: '#fff',
+    shadowColor: '#aaa',
+  },
+  darkCard: {
+    backgroundColor: '#181818',
+    shadowColor: '#000',
   },
   header: {
-    height: HEADER_HEIGHT,
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 16,
+    textAlign: 'center',
   },
   label: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 8,
+    marginVertical: 10,
+    fontSize: 16,
   },
   input: {
-    height: 40,
-    borderColor: 'gray',
     borderWidth: 1,
-    borderRadius: 10,
-    paddingHorizontal: 8,
-    marginBottom: 16,
-  },
-  lightContainer: {
-    backgroundColor: '#d0d0c0',
-  },
-  darkContainer: {
-    backgroundColor: '#0A0A0A',
+    borderRadius: 5,
+    padding: 10,
+    marginBottom: 10,
+    width: '100%',
+    borderColor: '#ccc',
   },
   lightThemeText: {
-    color: '#242c40',
+    color: '#000',
   },
   darkThemeText: {
-    color: '#E6E8E9',
+    color: '#fff',
   },
 });

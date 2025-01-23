@@ -86,7 +86,7 @@ export default function UserProfile() {
   return (
     <View style={[styles.container, themeContainerStyle]}>
       <View style={styles.header}>
-        <Text style={themeTextStyle}>@{name}</Text>
+        <Text style={styles.uname }>@{name}</Text>
         <Link href={{ pathname: 'settings', params: { user: JSON.stringify(user) } }} style={styles.settingsButton}>
           <IconSymbol name="line.3.horizontal" size={24} color={colorScheme === 'light' ? 'black' : 'white'} />
         </Link>
@@ -174,6 +174,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+  },
+  uname: {
+    fontSize: 20,
+    fontWeight: 'bold',
   },
   profileContainer: {
     alignItems: 'center',

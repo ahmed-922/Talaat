@@ -20,7 +20,7 @@ export default function TabLayout() {
         tabBarStyle: Platform.select({
           ios: {
             // Use a transparent background on iOS to show the blur effect
-            position: 'absolute',
+           
           },
           default: {},
         }),
@@ -28,7 +28,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="home"
         options={{
-          title: 'Home',
+          title: 'home',
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
         }}
       />
@@ -36,6 +36,7 @@ export default function TabLayout() {
         name="newTask"
         options={{
           title: 'New Task',
+          headerShown: false,
           tabBarIcon: ({ color }) => <IconSymbol name="plus.app" size={24} color={color} />,
         }}
       />
@@ -43,6 +44,7 @@ export default function TabLayout() {
         name="user"
         options={{
           title: 'User',
+          headerShown: false,
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="person.fill" color={color} />,
         }}
       />
