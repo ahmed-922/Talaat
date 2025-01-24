@@ -10,8 +10,9 @@ const SettingsScreen = () => {
   const handleSignOut = () => {
     signOut(auth)
       .then(() => {
-        // Sign-out successful.
-        router.push('./'); // Redirect to login screen after sign-out
+        // Sign-out successful
+        router.dismissAll();
+        router.replace('/signin'); // Redirect to login screen after sign-out
       })
       .catch((error) => {
         // An error happened.
