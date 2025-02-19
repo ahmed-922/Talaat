@@ -43,7 +43,8 @@
     "react-native-video": "^6.9.1",
     "react-native-web": "~0.19.13",
     "react-native-webview": "13.12.5",
-    "react-router-dom": "^7.1.1"
+    "react-router-dom": "^7.1.1",
+    "expo-image-picker": "~16.0.6"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",

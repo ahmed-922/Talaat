@@ -33,9 +33,9 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="newTask"
+        name="newPost"
         options={{
-          title: 'New Task',
+          title: 'New Post',
           headerShown: false,
           tabBarIcon: ({ color }) => <IconSymbol name="plus.app" size={24} color={color} />,
         }}

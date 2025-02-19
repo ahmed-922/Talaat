@@ -1,13 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Text, View, StyleSheet, TextInput, Button, Alert, Animated, ImageBackground, ActivityIndicator } from 'react-native';
-import { Link, useNavigation, useRouter } from 'expo-router';
-import { getAuth, signInWithEmailAndPassword, onAuthStateChanged } from 'firebase/auth';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Link, useRouter } from 'expo-router';
+import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
+
 
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(true);
   const router = useRouter();
   const auth = getAuth();
   const [emailLabelAnim] = useState(new Animated.Value(0));
@@ -113,8 +112,8 @@ export default function Login() {
       </View>
       <View style={styles.signupContainer}>
           <Text style={styles.signupLabel}>You don't have an account?</Text>
-          <Link href="/signup" style={styles.button}>
-            Signup
+          <Link href="/register" style={styles.button}>
+          register
           </Link>
         </View>
     </ImageBackground>

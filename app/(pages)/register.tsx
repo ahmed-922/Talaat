@@ -147,7 +147,7 @@ export default function Signup() {
           />
         </View>
 
-        <Button title="Signup" onPress={handleSignup} />
+        <Button title="register" onPress={handleSignup} />
       </View>
     </ImageBackground>
   );

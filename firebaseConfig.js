@@ -1,17 +1,18 @@
 // Import the functions you need from the SDKs you need
 import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
+import { getStorage } from "firebase/storage";       
 import { initializeAuth, getReactNativePersistence } from "firebase/auth";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
-  apiKey: "AIzaSyAaRLZnBvzmpITAHd9gKhMcl4BQFU9lJPI",
-  authDomain: "taskat-a0d3d.firebaseapp.com",
-  projectId: "taskat-a0d3d",
-  storageBucket: "taskat-a0d3d.firebasestorage.app",
-  messagingSenderId: "1055116345617",
-  appId: "1:1055116345617:web:377497f2becc9847bcccb0"
+  apiKey: "AIzaSyDFPo6kan3TsA-8ak-y6aowHJqrwZedAUo",
+  authDomain: "talaat-c40db.firebaseapp.com",
+  projectId: "talaat-c40db",
+  storageBucket: "talaat-c40db.firebasestorage.app",
+  messagingSenderId: "724861850438",
+  appId: "1:724861850438:web:fa8fb5ed3edcfa76f60b47"
 };
 
 // Initialize Firebase
@@ -20,9 +21,12 @@ const app = initializeApp(firebaseConfig);
 // Initialize Firestore
 const db = getFirestore(app);
 
+// Initialize Firebase Storage
+const storage = getStorage(app);                              // <-- create storage ref
+
 // Initialize Firebase Auth with AsyncStorage persistence
 const auth = initializeAuth(app, {
   persistence: getReactNativePersistence(AsyncStorage),
 });
 
-export { db, app, auth };
+export { db, storage ,app, auth };
