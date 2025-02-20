@@ -3,7 +3,8 @@ import { Text, View, StyleSheet, TextInput, Button, Alert, Animated } from 'reac
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { collection, query, where, getDocs, addDoc } from 'firebase/firestore';
 import { auth, db } from '../../firebaseConfig'; // Adjust the path as necessary
-import { ImageBackground } from 'react-native'; // Import ImageBackground
+import { ImageBackground } from 'react-native';
+import { getStorage, ref, getDownloadURL } from 'firebase/storage';
 
 export default function Signup() {
   const [email, setEmail] = useState('');
@@ -28,11 +29,17 @@ export default function Signup() {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
 
-      // Add user to Firestore with the unique username
+      // Retrieve the default profile picture URL from Firebase Storage
+      const storage = getStorage();
+      const defaultImageRef = ref(storage, 'gs://talaat-c40db.firebasestorage.app/profilePictures/Default/defaultpfp.png');
+      const defaultProfilePictureUrl = await getDownloadURL(defaultImageRef);
+
+      // Add user to Firestore with the default profile picture
       await addDoc(collection(db, 'users'), {
         uid: user.uid,
         email: user.email,
         username: username,
+        profilePicture: defaultProfilePictureUrl,
       });
 
       Alert.alert('User registered successfully!');
@@ -51,7 +58,7 @@ export default function Signup() {
 
   return (
     <ImageBackground
-      source={{ uri: 'https://letsenhance.io/static/8f5e523ee6b2479e26ecc91b9c25261e/1015f/MainAfter.jpg' }} 
+      source={{ uri: 'https://letsenhance.io/static/8f5e523ee6b2479e26ecc91b9c25261e/1015f/MainAfter.jpg' }}
       style={styles.background}
     >
       <View style={styles.box}>
@@ -163,10 +170,10 @@ const styles = StyleSheet.create({
     width: '80%',
     padding: 20,
     borderRadius: 10,
-    backgroundColor: 'rgba(255, 255, 255, 0.3)', // Semi-transparent white background
-    borderColor: 'rgba(255, 255, 255, 0.5)', // White border with 50% opacity
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    borderColor: 'rgba(255, 255, 255, 0.5)',
     borderWidth: 1,
-    backdropFilter: 'blur(10px)', // Blur effect
+    backdropFilter: 'blur(10px)',
   },
   inputContainer: {
     position: 'relative',
@@ -177,14 +184,14 @@ const styles = StyleSheet.create({
     left: 10,
     fontSize: 16,
     fontWeight: 'bold',
-    backgroundColor: 'rgba(255, 255, 255, 0)', // Match the box background
+    backgroundColor: 'rgba(255, 255, 255, 0)',
     paddingHorizontal: 5,
   },
   input: {
     height: 40,
     borderColor: 'gray',
-    borderBottomWidth: 1, // Rounded corners
-    borderRadius: 20, // More rounded corners
+    borderBottomWidth: 1,
+    borderRadius: 20,
     paddingHorizontal: 8,
     width: '100%',
   },

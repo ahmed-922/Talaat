@@ -1,32 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, Button, StyleSheet, Image, TouchableOpacity, FlatList, useColorScheme } from 'react-native';
-import { collection, query, where, getDocs, updateDoc, doc } from 'firebase/firestore';
+import { View, Text, Image, TouchableOpacity, StyleSheet, useColorScheme } from 'react-native';
+import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db, auth } from '../../firebaseConfig';
-import { onAuthStateChanged, signOut, User } from 'firebase/auth';
-import { useRouter, Link } from 'expo-router';
+import { onAuthStateChanged } from 'firebase/auth';
+import { Link } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 
-const DarkButton = ({ title, onPress }) => (
-  <TouchableOpacity onPress={onPress} style={[styles.button, styles.darkButton]}>
-    <Text style={styles.darkButtonText}>{title}</Text>
-  </TouchableOpacity>
-);
-
-const LightButton = ({ title, onPress }) => (
-  <TouchableOpacity onPress={onPress} style={[styles.button, styles.lightButton]}>
-    <Text style={styles.lightButtonText}>{title}</Text>
-  </TouchableOpacity>
-);
-
 export default function UserProfile() {
-  const [user, setUser] = useState<User | null>(null);
-  const [tasks, setTasks] = useState([]);
+  const [user, setUser] = useState(null);
   const [name, setName] = useState('');
   const [profilePicture, setProfilePicture] = useState('');
-  const [isEditing, setIsEditing] = useState(false);
-  const router = useRouter();
+  const [bio, setBio] = useState('');
+  const [postsCount, setPostsCount] = useState(0);
+  const [followersCount, setFollowersCount] = useState(0);
+  const [followingCount, setFollowingCount] = useState(0);
   const colorScheme = useColorScheme();
 
   useEffect(() => {
@@ -34,12 +22,11 @@ export default function UserProfile() {
       if (currentUser) {
         setUser(currentUser);
         fetchUserProfile(currentUser.uid);
-        fetchUserTasks(currentUser.uid);
+        fetchUserPostsCount(currentUser.uid);
       } else {
         console.log('User is not logged in');
       }
     });
-
     return () => unsubscribe();
   }, []);
 
@@ -48,117 +35,113 @@ export default function UserProfile() {
     if (!userDoc.empty) {
       const userData = userDoc.docs[0].data();
       setName(userData.username);
-      setProfilePicture(userData.profilePicture);
+      setProfilePicture(userData.profilePicture || '');
+      setBio(userData.bio || '');
+      if (userData.followers) {
+        setFollowersCount(userData.followers.length);
+      }
+      if (userData.following) {
+        setFollowingCount(userData.following.length);
+      }
     }
   };
 
-  const fetchUserTasks = async (uid) => {
-    const tasksQuery = query(collection(db, 'tasks'), where('userId', '==', uid));
-    const tasksSnapshot = await getDocs(tasksQuery);
-    if (!tasksSnapshot.empty) {
-      setTasks(tasksSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    } else {
-      setTasks([]);
+  const fetchUserPostsCount = async (uid) => {
+    try {
+      const postsQuery = query(collection(db, 'posts'), where('byUser', '==', uid));
+      const postsSnapshot = await getDocs(postsQuery);
+      setPostsCount(postsSnapshot.docs.length);
+    } catch (error) {
+      console.error("Error fetching posts count:", error);
     }
-  };
-
-  const handleUpdateProfile = async () => {
-    if (user) {
-      const userDoc = doc(db, 'users', user.uid);
-      await updateDoc(userDoc, {
-        username: name,
-        profilePicture,
-      });
-      setIsEditing(false);
-    }
-  };
-
-  const handleLogout = async () => {
-    await signOut(auth);
-    await AsyncStorage.removeItem('user');
-    console.log('User is logged out');
   };
 
   const themeTextStyle = colorScheme === 'light' ? styles.lightThemeText : styles.darkThemeText;
   const themeContainerStyle = colorScheme === 'light' ? styles.lightContainer : styles.darkContainer;
-  const ButtonComponent = colorScheme === 'light' ? LightButton : DarkButton;
 
   return (
     <View style={[styles.container, themeContainerStyle]}>
       <View style={styles.header}>
-        <Text style={styles.uname }>@{name}</Text>
-        <Link href={{ pathname: 'settings', params: { user: JSON.stringify(user) } }} style={styles.settingsButton}>
-          <IconSymbol name="line.3.horizontal" size={24} color={colorScheme === 'light' ? 'black' : 'white'} />
+        <Text style={styles.uname}>@{name}</Text>
+        <Link
+          href={{ pathname: 'settings', params: { user: JSON.stringify(user) } }}
+          style={styles.settingsButton}
+        >
+          <IconSymbol
+            name="line.3.horizontal"
+            size={24}
+            color={colorScheme === 'light' ? 'black' : 'white'}
+          />
         </Link>
       </View>
+
       {user && (
-        <>
+        <View style={styles.content}>
           <View style={styles.profileContainer}>
             {profilePicture ? (
               <Image source={{ uri: profilePicture }} style={styles.profilePicture} />
             ) : (
-              <Ionicons name="person-circle-outline" size={100} color={colorScheme === 'light' ? 'black' : 'white'} />
+              <Ionicons
+                name="person-circle-outline"
+                size={100}
+                color={colorScheme === 'light' ? 'black' : 'white'}
+              />
             )}
-            <Text style={[styles.name, themeTextStyle]}>{name}</Text>
+            <Text style={[styles.name, themeTextStyle, styles.centerText]}>{name}</Text>
+            <Text style={[styles.bio, themeTextStyle, styles.centerText]}>{bio}</Text>
 
-            <View>
-            <View style={{ flexDirection: 'row', width: '70%', justifyContent: 'space-between' }}>
-            <Text style={[styles.nsub, themeTextStyle]}>0</Text>
-            <Text style={[styles.nsub, themeTextStyle]}>0/10</Text>
-            <Text style={[styles.nsub, themeTextStyle]}>0</Text>
-            </View>
-            <View style={{ flexDirection: 'row', width: '70%', justifyContent: 'space-between' }}>
-            <Text style={[styles.sub, themeTextStyle]}>Followers</Text>
-            <Text style={[styles.sub, themeTextStyle]}>Reviews</Text>
-            <Text style={[styles.sub, themeTextStyle]}>Task done</Text>
-            </View>
+            {/* Centered Stats */}
+            <View style={styles.statsContainer}>
+              <View style={styles.statContainer}>
+                <Text style={[styles.statCount, themeTextStyle]}>{postsCount}</Text>
+                <Text style={[styles.statLabel, themeTextStyle]}>Posts</Text>
+              </View>
+              <View style={styles.statContainer}>
+                <Text style={[styles.statCount, themeTextStyle]}>{followersCount}</Text>
+                <Text style={[styles.statLabel, themeTextStyle]}>Followers</Text>
+              </View>
+              <View style={styles.statContainer}>
+                <Text style={[styles.statCount, themeTextStyle]}>{followingCount}</Text>
+                <Text style={[styles.statLabel, themeTextStyle]}>Following</Text>
+              </View>
             </View>
 
-            <TouchableOpacity onPress={() => setIsEditing(true)}>
-            </TouchableOpacity>
-            <View style={{ flexDirection: 'row', width: '70%', justifyContent: 'space-between' }}>
-              <ButtonComponent title="Edit Profile" onPress={() => setIsEditing(true)} />
-              <ButtonComponent title="Share Profile" onPress={() => { /* Add share functionality here */ }} />
-              <ButtonComponent title="+"/>
+            {/* Buttons Row with Improved Design */}
+            <View style={styles.buttonRow}>
+              <Link
+                href="../(pages)/EditProfile"
+                style={[styles.button, colorScheme === 'light' ? styles.lightButton : styles.darkButton]}
+              >
+                <Text style={colorScheme === 'light' ? styles.lightButtonText : styles.darkButtonText}>
+                  Edit Profile
+                </Text>
+              </Link>
+              <TouchableOpacity
+                style={[styles.button, colorScheme === 'light' ? styles.lightButton : styles.darkButton]}
+                onPress={() => console.log('Share profile pressed')}
+              >
+                <Text style={colorScheme === 'light' ? styles.lightButtonText : styles.darkButtonText}>
+                  Share Profile
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.button, colorScheme === 'light' ? styles.lightButton : styles.darkButton]}
+                onPress={() => console.log('Plus button pressed')}
+              >
+                <Text style={colorScheme === 'light' ? styles.lightButtonText : styles.darkButtonText}>
+                  +
+                </Text>
+              </TouchableOpacity>
             </View>
           </View>
-          {isEditing && (
-            <View style={styles.editContainer}>
-              <Text style={[styles.label, themeTextStyle]}>Username</Text>
-              <TextInput
-                style={[styles.input, themeTextStyle]}
-                value={name}
-                onChangeText={setName}
-                placeholder="Enter your username"
-                placeholderTextColor={colorScheme === 'light' ? '#242c40' : '#d0d0c0'}
-              />
-              <Text style={[styles.label, themeTextStyle]}>Profile Picture URL</Text>
-              <TextInput
-                style={[styles.input, themeTextStyle]}
-                value={profilePicture}
-                onChangeText={setProfilePicture}
-                placeholder="Enter profile picture URL"
-                placeholderTextColor={colorScheme === 'light' ? '#242c40' : '#d0d0c0'}
-              />
-              <ButtonComponent title="Save" onPress={handleUpdateProfile} />
-              <ButtonComponent title="Cancel" onPress={() => setIsEditing(false)} />
-            </View>
-          )}
-          <Text style={[styles.label, themeTextStyle]}>Tasks</Text>
-          {tasks.length > 0 ? (
-            <FlatList
-              data={tasks}
-              keyExtractor={(item) => item.id}
-              renderItem={({ item }) => (
-                <View style={styles.taskItem}>
-                  <Text style={themeTextStyle}>{item.title}</Text>
-                </View>
-              )}
-            />
-          ) : (
-            <Text style={themeTextStyle}>There are no tasks</Text>
-          )}
-        </>
+
+          <Text style={[styles.sectionLabel, themeTextStyle, styles.centerText]}>Posts</Text>
+          <Text style={[themeTextStyle, styles.centerText]}>
+            {postsCount > 0
+              ? `You have ${postsCount} post${postsCount > 1 ? 's' : ''}`
+              : 'There are no Posts'}
+          </Text>
+        </View>
       )}
     </View>
   );
@@ -168,8 +151,10 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 20,
+    alignItems: 'center', // centers all content horizontally
   },
   header: {
+    width: '100%',
     height: 100,
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -178,6 +163,13 @@ const styles = StyleSheet.create({
   uname: {
     fontSize: 20,
     fontWeight: 'bold',
+  },
+  settingsButton: {
+    padding: 10,
+  },
+  content: {
+    width: '100%',
+    alignItems: 'center', // centers content within the main area
   },
   profileContainer: {
     alignItems: 'center',
@@ -193,28 +185,47 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 8,
   },
-  editContainer: {
+  bio: {
+    fontSize: 16,
+    marginBottom: 16,
+  },
+  statsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginVertical: 15,
+  },
+  statContainer: {
+    alignItems: 'center',
+    marginHorizontal: 20,
+  },
+  statCount: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  statLabel: {
+    fontSize: 14,
+  },
+  buttonRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    width: '100%',
     marginTop: 20,
   },
-  label: {
-    fontSize: 18,
+  sectionLabel: {
+    fontSize: 20,
     fontWeight: 'bold',
-    marginBottom: 8,
-  },
-  input: {
-    height: 40,
-    borderColor: 'gray',
-    borderWidth: 1,
-    borderRadius: 10,
-    paddingHorizontal: 8,
-    marginBottom: 16,
+    marginTop: 20,
   },
   lightContainer: {
     backgroundColor: '#d0d0c0',
+    width: '100%',
+    flex: 1,
   },
   darkContainer: {
     backgroundColor: '#0A0A0A',
-    
+    width: '100%',
+    flex: 1,
   },
   lightThemeText: {
     color: '#242c40',
@@ -222,39 +233,29 @@ const styles = StyleSheet.create({
   darkThemeText: {
     color: '#E6E8E9',
   },
-  settingsButton: {
-    padding: 10,
-  },
   button: {
-    padding: 10,
-    borderRadius: 5,
-    marginVertical: 5,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 8,
     alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 2,
+  },
+  lightButton: {
+    backgroundColor: '#fff',
   },
   darkButton: {
     backgroundColor: '#333',
   },
-  lightButton: {
-    backgroundColor: '#fff',
-    borderColor: '#000',
-    borderWidth: 1,
+  lightButtonText: {
+    color: '#000',
+    fontWeight: '600',
   },
   darkButtonText: {
     color: '#fff',
+    fontWeight: '600',
   },
-  lightButtonText: {
-    color: '#000',
+  centerText: {
+    textAlign: 'center',
   },
-  taskItem: {
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: 'gray',
-  },
-  sub: {
-    fontSize: 15,
-    fontWeight: 'bold',
-  },
-  nsub: {
-    fontSize: 14,
-  }
 });

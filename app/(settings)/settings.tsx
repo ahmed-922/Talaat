@@ -12,7 +12,7 @@ const SettingsScreen = () => {
       .then(() => {
         // Sign-out successful
         router.dismissAll();
-        router.replace('/signin'); // Redirect to login screen after sign-out
+        router.replace('../login'); // Redirect to login screen after sign-out
       })
       .catch((error) => {
         // An error happened.

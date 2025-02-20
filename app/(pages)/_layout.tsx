@@ -28,6 +28,8 @@ export default function RootLayout() {
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <Stack>
       <Stack.Screen name="register" options={{ headerShown: true, headerTitle: 'back' }} />
+      <Stack.Screen name="EditProfile" options={{ headerShown: true, headerTitle: 'back' }} />
+      <Stack.Screen name="UserProfile" options={{ headerShown: true, headerTitle: 'back' }} />
       </Stack>
       <StatusBar style="auto" />
     </ThemeProvider>
