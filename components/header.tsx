@@ -9,12 +9,12 @@ export default function Header() {
     <View style={{ justifyContent: 'center' }}>
       <View style={{ height: 60 }} />
       {/* Use Link to navigate to the Chats page */}
-      <Link href="/chats">
-        <DM />
-      </Link>
       <View style={styles.header}>
         <Text style={styles.title}>TALAAT</Text>
         <Tags />
+        <Link href="/chats">
+        <DM />
+      </Link>
       </View>
     </View>
   );
