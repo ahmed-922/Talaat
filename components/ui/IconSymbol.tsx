@@ -14,8 +14,10 @@ const MAPPING = {
   'plus.fill': 'add-box',
   'chevron.left.forwardslash.chevron.right': 'code',
   'chevron.right': 'chevron-right',
-  'plus.app': 'add',
+  'add.fill': 'add',
   'line.3.horizontal': 'menu',
+  'inbox.fill': 'inbox',
+    'search.fill': 'search'
 } as Partial<
   Record<
     import('expo-symbols').SymbolViewProps['name'],

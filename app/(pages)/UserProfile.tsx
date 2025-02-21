@@ -124,8 +124,10 @@ export default function UserProfile() {
             docId: docId,
           });
 
-          // Set counts (if stored in the doc; will be updated later for postsCount)
-          setFollowersCount(data.followersCount || 0);
+          // --- ONLY THIS LINE CHANGED ---
+          // Instead of data.followersCount, we use the actual array length:
+          setFollowersCount(data.followers?.length || 0);
+
           setFollowingCount(data.followingCount || 0);
           // Optionally, use stored postsCount as a starting value
           setPostsCount(data.postsCount || 0);
@@ -151,17 +153,18 @@ export default function UserProfile() {
   useEffect(() => {
     if (!userData) return;
 
-
-      const fetchPostsCount = async () => {
-        try {
-          const postsQuery = query(collection(db, 'posts'), where('byUser', '==', userData.uid));
-          const postsSnapshot = await getDocs(postsQuery);
-          setPostsCount(postsSnapshot.docs.length);
-        } catch (error) {
-          console.error("Error fetching posts count:", error);
-        }
-      };
-    
+    const fetchPostsCount = async () => {
+      try {
+        const postsQuery = query(
+          collection(db, "posts"),
+          where("byUser", "==", userData.uid)
+        );
+        const postsSnapshot = await getDocs(postsQuery);
+        setPostsCount(postsSnapshot.docs.length);
+      } catch (error) {
+        console.error("Error fetching posts count:", error);
+      }
+    };
 
     fetchPostsCount();
   }, [userData]);
@@ -302,7 +305,9 @@ export default function UserProfile() {
       {/* Posts Section */}
       <View style={{ marginTop: 30 }}>
         <Text style={styles.postsHeader}>Posts</Text>
-        <Text>{userData.username} have {postsCount} posts</Text>
+        <Text>
+          {userData.username} have {postsCount} posts
+        </Text>
       </View>
     </View>
   );
@@ -312,7 +317,6 @@ const styles = StyleSheet.create({
   container: {
     alignItems: "center",
     justifyContent: "center",
-   
     padding: 20,
   },
   profilePic: {

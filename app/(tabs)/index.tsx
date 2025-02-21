@@ -1,10 +1,10 @@
+// index.tsx
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, StyleSheet, ActivityIndicator, Text } from 'react-native';
 import { useRouter } from 'expo-router';
 import { getAuth, onAuthStateChanged } from '@firebase/auth';
+import Header from '../../components/header';
 import Media from '../../components/media';
-
-export const HEADER_HEIGHT = 100;
 
 const SplashScreen = ({ onAuthCheckComplete }: { onAuthCheckComplete: () => void }) => {
   const router = useRouter();
@@ -23,7 +23,7 @@ const SplashScreen = ({ onAuthCheckComplete }: { onAuthCheckComplete: () => void
   }, []);
 
   return (
-    <View style={styles.container}>
+    <View style={styles.splashContainer}>
       <ActivityIndicator size="large" color="#0000ff" />
       <Text style={styles.text}>Loading...</Text>
     </View>
@@ -52,10 +52,13 @@ export default function Home() {
   if (loading) {
     return <SplashScreen onAuthCheckComplete={() => setLoading(false)} />;
   }
+
   return (
-    // Make sure the outer container fills the screen using flex: 1
-    <View style={{ flex: 1 }}>
-      <View style={[styles.header, styles.lightHeader]} />
+    <View style={{ flex: 1, backgroundColor: 'white' }}>
+      {/* Fixed Header at the Top */}
+      <Header />
+
+      {/* Main Content Below the Header */}
       <View style={{ flex: 1 }}>
         <Media />
       </View>
@@ -64,56 +67,16 @@ export default function Home() {
 }
 
 const styles = StyleSheet.create({
-  container: {
+  splashContainer: {
     flex: 1,
     paddingTop: 50,
     alignItems: 'center',
-    justifyContent: 'center'
-  },
-  header: {
-    height: HEADER_HEIGHT,
-  },
-  lightHeader: {
-    backgroundColor: '#f8f8f8'
-  },
-  darkHeader: {
-    backgroundColor: 'rgb(10, 10, 10)'
-  },
-  headerText: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    flex: 1
-  },
-  lightHeaderText: {
-    color: '#000'
-  },
-  darkHeaderText: {
-    color: '#fff'
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 8
-  },
-  lightThemeText: {
-    color: 'black'
-  },
-  darkThemeText: {
-    color: 'white'
-  },
-  lightContainer: {
-    backgroundColor: 'rgba(213, 213, 213, 0.56)',
-    borderColor: 'rgba(39, 37, 37, 0.27)'
-  },
-  darkContainer: {
-    backgroundColor: '#181818'
-  },
-  link: {
-    textDecorationLine: 'none'
+    justifyContent: 'center',
+    
   },
   text: {
     marginTop: 20,
     fontSize: 18,
-    fontWeight: 'bold'
-  }
+    fontWeight: 'bold',
+  },
 });

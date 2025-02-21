@@ -1,31 +1,97 @@
 import React, { useEffect, useState } from "react";
-import { 
-  View, 
-  Text, 
-  Image, 
-  TouchableOpacity, 
-  Modal, 
-  StyleSheet, 
-  TextInput, 
-  Button, 
-  FlatList, 
-  Share as RNShare 
+import {
+  View,
+  Text,
+  Image,
+  TouchableOpacity,
+  Modal,
+  StyleSheet,
+  TextInput,
+  Button,
+  FlatList,
+  Share as RNShare,
 } from "react-native";
-import { 
-  collection, 
-  doc, 
-  getDocs, 
-  onSnapshot, 
-  setDoc, 
-  updateDoc, 
-  arrayUnion, 
-  arrayRemove, 
-  serverTimestamp, 
-  query, 
-  where 
+import {
+  collection,
+  doc,
+  getDocs,
+  onSnapshot,
+  setDoc,
+  updateDoc,
+  arrayUnion,
+  arrayRemove,
+  serverTimestamp,
+  query,
+  where,
 } from "firebase/firestore";
 import { db, auth } from "../firebaseConfig";
 import { Link } from "expo-router"; // Import Link for navigation
+import Likes from "./svgs/likes";
+import Likesfill from "./svgs/likesfill";
+import Comments from "./svgs/comments";
+import Share from "./svgs/share";
+import TrendsIcon from "./svgs/trends";
+
+// --- Helper Functions for Timestamp Formatting ---
+
+function timeAgo(date: Date) {
+  const now = new Date();
+  const secondsElapsed = Math.floor((now.getTime() - date.getTime()) / 1000);
+
+  if (secondsElapsed < 60) {
+    return "Just now";
+  }
+
+  const minutes = Math.floor(secondsElapsed / 60);
+  if (minutes < 60) {
+    return minutes === 1 ? "1 minute ago" : `${minutes} minutes ago`;
+  }
+
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) {
+    return hours === 1 ? "1 hour ago" : `${hours} hours ago`;
+  }
+
+  const days = Math.floor(hours / 24);
+  if (days < 7) {
+    return days === 1 ? "1 day ago" : `${days} days ago`;
+  }
+
+  const weeks = Math.floor(days / 7);
+  if (weeks < 4) {
+    return weeks === 1 ? "1 week ago" : `${weeks} weeks ago`;
+  }
+
+  const months = Math.floor(days / 30);
+  if (months < 12) {
+    return months === 1 ? "1 month ago" : `${months} months ago`;
+  }
+
+  const years = Math.floor(months / 12);
+  return years === 1 ? "1 year ago" : `${years} years ago`;
+}
+
+function formatTime(date: Date) {
+  // 24-hour format with seconds
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+  const seconds = String(date.getSeconds()).padStart(2, "0");
+  return `${hours}:${minutes}`;
+}
+
+// --- Component to Display the Post Timestamp ---
+
+function PostTimestamp({ createdAt }: { createdAt: any }) {
+  if (!createdAt || typeof createdAt.toDate !== "function") return null;
+  const date = createdAt.toDate();
+  return (
+    <Text style={styles.timestamp}>
+      {timeAgo(date)} at {formatTime(date)}
+    </Text>
+  );
+}
+
+// --- Custom Hooks for Fetching User Data ---
 
 // Custom hook to fetch a username given the user's UID.
 function useUsername(uid: string) {
@@ -79,7 +145,8 @@ function useProfilePicture(uid: string) {
   return profilePicture;
 }
 
-// Main Media screen: fetches posts from the "posts" collection and renders them.
+// --- Main Media Screen ---
+
 export default function Media() {
   const [posts, setPosts] = useState<any[]>([]);
 
@@ -106,17 +173,14 @@ export default function Media() {
       {posts.length === 0 ? (
         <Text style={styles.noPosts}>No posts available</Text>
       ) : (
-        <FlatList 
-          data={posts} 
-          renderItem={renderPost} 
-          keyExtractor={(item) => item.id} 
-        />
+        <FlatList data={posts} renderItem={renderPost} keyExtractor={(item) => item.id} />
       )}
     </View>
   );
 }
 
-// PostItem component.
+// --- PostItem Component ---
+
 function PostItem({ post }: { post: any }) {
   const currentUser = auth.currentUser;
   const userUID = currentUser?.uid;
@@ -219,45 +283,45 @@ function PostItem({ post }: { post: any }) {
     <View style={styles.postContainer}>
       {/* Top Bar: Clickable user info wrapped in a Link */}
       <View style={styles.topBar}>
-        <Link
-          href={`../(pages)/UserProfile?uid=${localPost.byUser}`}
-          style={styles.Unp}
-        >
-          <Image
-            source={{ uri: authorProfilePicture }}
-            style={styles.userPhoto}
-          />
-          <Text style={styles.usernameText}>@{authorUsername}</Text>
+        <Link href={`../(pages)/UserProfile?uid=${localPost.byUser}`} style={styles.Unp}>
+          <View style={{ flexDirection: "row", alignItems: "center" }}>
+            <Image source={{ uri: authorProfilePicture || '../photos/defaultpfp.png'  }} style={styles.userPhoto} resizeMode="contain" />
+            <Text style={styles.usernameText}>{authorUsername}</Text>
+          </View>
         </Link>
         <TouchableOpacity onPress={() => setOptionsModalVisible(true)}>
           <Text style={styles.optionsText}>. . .</Text>
         </TouchableOpacity>
       </View>
 
-      {/* Post image, caption, likes, and bottom bar */}
+      {/* Post image */}
       {localPost.img ? (
         <Image source={{ uri: localPost.img }} style={styles.postImage} />
       ) : null}
+
+      {/* Timestamp */}
+      <PostTimestamp createdAt={localPost.createdAt} />
+
+      {/* Caption */}
       <Text style={styles.caption}>{localPost.caption}</Text>
-      <Text style={styles.likesCount}>
-        {localPost.likes?.length || 0}{" "}
-        {localPost.likes?.length === 1 ? "like" : "likes"}
-      </Text>
+
+      {/* Bottom Bar with Like, Comment & Share */}
       <View style={styles.bottomBar}>
         <TouchableOpacity onPress={handleLikeToggle}>
-          <Text style={styles.buttonText}>
-            {alreadyLiked ? "❤️" : "🤍"} Like
-          </Text>
+          <View style={{ flexDirection: "row", alignItems: "center" }}>
+            {alreadyLiked ? <Likesfill /> : <Likes />}
+            <Text style={styles.buttonText}>{localPost.likes?.length || 0}</Text>
+          </View>
         </TouchableOpacity>
         <TouchableOpacity onPress={() => setCommentModalVisible(true)}>
-          <Text style={styles.buttonText}>💬 Comment</Text>
+          <Text style={styles.buttonText2}><Comments/></Text>
         </TouchableOpacity>
         <TouchableOpacity onPress={() => setShareModalVisible(true)}>
-          <Text style={styles.buttonText}>🔗 Share</Text>
+          <Text style={styles.buttonText2}><Share/></Text>
         </TouchableOpacity>
       </View>
 
-      {/* Modals for Comments, Share, and Options */}
+      {/* Comments Modal */}
       <Modal
         visible={commentModalVisible}
         animationType="slide"
@@ -288,15 +352,12 @@ function PostItem({ post }: { post: any }) {
               onChangeText={setNewCommentText}
             />
             <Button title="Add Comment" onPress={handleAddComment} />
-            <Button
-              title="Close"
-              onPress={() => setCommentModalVisible(false)}
-              color="red"
-            />
+            <Button title="Close" onPress={() => setCommentModalVisible(false)} color="red" />
           </View>
         </View>
       </Modal>
 
+      {/* Share Modal */}
       <Modal
         visible={shareModalVisible}
         animationType="slide"
@@ -308,15 +369,12 @@ function PostItem({ post }: { post: any }) {
             <Text style={styles.modalTitle}>Share Post</Text>
             <Text>Share this post with your friends!</Text>
             <Button title="Share Now" onPress={handleShare} />
-            <Button
-              title="Cancel"
-              onPress={() => setShareModalVisible(false)}
-              color="red"
-            />
+            <Button title="Cancel" onPress={() => setShareModalVisible(false)} color="red" />
           </View>
         </View>
       </Modal>
 
+      {/* Options Modal */}
       <Modal
         visible={optionsModalVisible}
         animationType="slide"
@@ -337,17 +395,15 @@ function PostItem({ post }: { post: any }) {
             <TouchableOpacity style={styles.optionItem}>
               <Text>Copy Link (not implemented)</Text>
             </TouchableOpacity>
-            <Button
-              title="Close"
-              onPress={() => setOptionsModalVisible(false)}
-              color="red"
-            />
+            <Button title="Close" onPress={() => setOptionsModalVisible(false)} color="red" />
           </View>
         </View>
       </Modal>
     </View>
   );
 }
+
+// --- Styles ---
 
 const styles = StyleSheet.create({
   container: {
@@ -398,13 +454,15 @@ const styles = StyleSheet.create({
     height: 300,
     marginBottom: 8,
     resizeMode: "cover",
+    borderRadius: 10
   },
   caption: {
     marginBottom: 4,
   },
-  likesCount: {
+  timestamp: {
     marginBottom: 4,
-    fontStyle: "italic",
+    color: "#666",
+    fontSize: 12,
   },
   bottomBar: {
     flexDirection: "row",
@@ -412,6 +470,10 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     fontSize: 16,
+  },
+  buttonNum: {
+    color: "black",
+    textAlign: "center",
   },
   modalOverlay: {
     flex: 1,
@@ -451,4 +513,12 @@ const styles = StyleSheet.create({
   optionItem: {
     paddingVertical: 8,
   },
+  logo: {
+    marginTop: 20,
+    marginBottom: 20,
+  },
+  buttonText2: {
+    height: 24,
+    width: 24
+  }
 });

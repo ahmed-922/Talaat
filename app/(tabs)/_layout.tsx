@@ -6,6 +6,8 @@ import { IconSymbol } from '@/components/ui/IconSymbol';
 import TabBarBackground from '@/components/ui/TabBarBackground';
 import { Colors } from '@/constants/Colors';
 import { useColorScheme } from '@/hooks/useColorScheme';
+import TrendsIcon from '@/components/svgs/trends';
+
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
@@ -28,30 +30,40 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Home',
+          title: '',
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
+        }}
+      />
+       <Tabs.Screen
+        name="search"
+        options={{
+          title: '',
+          headerShown: false,
+          tabBarIcon: ({ color }) => <IconSymbol size={28} name="search.fill" color={color} />,
         }}
       />
       <Tabs.Screen
         name="newPost"
         options={{
-          title: 'New Post',
+          title: '',
           headerShown: false,
-          tabBarIcon: ({ color }) => <IconSymbol name="plus.app" size={24} color={color} />,
+          tabBarIcon: ({ color }) => <IconSymbol name="add.fill" size={24} color={color} />,
         }}
       />
+     <Tabs.Screen
+  name="trends"
+  options={{
+    title: 'trends',
+    headerShown: false,
+    tabBarIcon: ({ color }) => (
+      <TrendsIcon width={24} height={24} fill={color} />
+    ),
+  }}
+/>
       <Tabs.Screen
         name="user"
         options={{
-          title: 'User',
-          headerShown: false,
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="person.fill" color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="UserProfile"
-        options={{
-          title: 'Users',
+          title: '',
           headerShown: false,
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="person.fill" color={color} />,
         }}
