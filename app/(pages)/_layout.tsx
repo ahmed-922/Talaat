@@ -30,6 +30,7 @@ export default function RootLayout() {
       <Stack.Screen name="register" options={{ headerShown: true, headerTitle: 'back' }} />
       <Stack.Screen name="EditProfile" options={{ headerShown: true, headerTitle: 'back' }} />
       <Stack.Screen name="UserProfile" options={{ headerShown: true, headerTitle: 'back' }} />
+      <Stack.Screen name="chats" options={{ headerShown: true, headerTitle: 'back' }} />
       </Stack>
       <StatusBar style="auto" />
     </ThemeProvider>

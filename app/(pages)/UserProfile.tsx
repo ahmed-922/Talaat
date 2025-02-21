@@ -32,7 +32,7 @@ export default function UserProfile() {
   // Firestore doc ID for the current user
   const [currentUserDocId, setCurrentUserDocId] = useState<string | null>(null);
 
-  // Target user's data (the profile we’re visiting)
+  // Target user's data (the profile we're visiting)
   const [userData, setUserData] = useState<any>(null);
   // Loading state
   const [loading, setLoading] = useState(true);
@@ -87,7 +87,7 @@ export default function UserProfile() {
   }, [currentUser]);
 
   /**
-   * 3) If the route’s uid is the same as currentUser.uid, redirect to /user.
+   * 3) If the route's uid is the same as currentUser.uid, redirect to /user.
    */
   useEffect(() => {
     if (currentUser && uid === currentUser.uid) {
@@ -225,8 +225,15 @@ export default function UserProfile() {
    * 7) Message button logic
    */
   const handleMessage = () => {
-    if (!userData) return;
-    router.push(`/messages?recipientId=${userData.uid}`);
+    if (!userData?.uid || !currentUser) {
+      Alert.alert('Error', 'Cannot start chat at this time');
+      return;
+    }
+    // Use the correct path format for Expo Router
+    router.push({
+      pathname: '/messages',
+      params: { recipientId: userData.uid }
+    });
   };
 
   /**
