@@ -1,19 +1,37 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, TextInput, StyleSheet, Image, ScrollView, SafeAreaView, Button, Alert } from 'react-native';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  TextInput,
+  StyleSheet,
+  Image,
+  ScrollView,
+  SafeAreaView,
+  Button,
+  Alert,
+} from 'react-native';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { collection, addDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage, auth } from '../../firebaseConfig'; // adjust path as needed
 
+// Define an interface for the asset (image or video)
+interface Asset {
+  uri: string;
+  type: 'image' | 'video';
+}
+
 export default function NewPostScreen() {
   const router = useRouter();
   const [caption, setCaption] = useState('');
   const [extraText, setExtraText] = useState('');
-  const [imageUri, setImageUri] = useState<string | null>(null);
+  // Now store the picked asset (which may be an image or a video)
+  const [asset, setAsset] = useState<Asset | null>(null);
   const currentUser = auth.currentUser;
 
-  const pickImage = async () => {
+  const pickAsset = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
       alert('Permission to access camera roll is required!');
@@ -21,48 +39,76 @@ export default function NewPostScreen() {
     }
 
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ImagePicker.MediaTypeOptions.All, // Accept both images and videos
       allowsEditing: true,
       aspect: [4, 3],
       quality: 1,
     });
 
     if (!result.canceled) {
-      setImageUri(result.assets[0].uri);
+      const pickedAsset = result.assets[0];
+      // Determine asset type (fallback to checking file extension if not provided)
+      const assetType =
+        pickedAsset.type ||
+        (pickedAsset.uri.match(/\.(mp4|mov)$/i) ? 'video' : 'image');
+      setAsset({ uri: pickedAsset.uri, type: assetType as 'image' | 'video' });
     }
   };
 
   const handlePost = async () => {
     // Validate that at least one of the text inputs is non-empty
     if (!caption.trim() && !extraText.trim()) {
-      Alert.alert("Error", "Please add either a caption or extra text before posting.");
+      Alert.alert('Error', 'Please add either a caption or extra text before posting.');
       return;
     }
 
     try {
       let downloadURL = '';
 
-      if (imageUri) {
-        const response = await fetch(imageUri);
+      if (asset) {
+        const response = await fetch(asset.uri);
         const blob = await response.blob();
-        const storageRef = ref(storage, `photos/${Date.now()}.jpg`);
+
+        // Choose the storage path based on asset type
+        const storagePath =
+          asset.type === 'video'
+            ? `videos/${Date.now()}.mp4`
+            : `photos/${Date.now()}.jpg`;
+        const storageRef = ref(storage, storagePath);
+
         await uploadBytes(storageRef, blob);
         downloadURL = await getDownloadURL(storageRef);
       }
 
-      await addDoc(collection(db, 'posts'), {
+      // Choose the Firestore collection based on asset type:
+      // If asset is a video, add to 'videos' collection; otherwise, 'posts'
+      const collectionName =
+        asset && asset.type === 'video' ? 'videos' : 'posts';
+
+      const postData = {
         byUser: currentUser?.uid || 'anonymous',
         caption,
         extraText,
-        img: downloadURL,
         likes: [],
         createdAt: new Date(),
-      });
+      };
+
+      // Save the URL under a specific key based on asset type
+      if (asset) {
+        if (asset.type === 'video') {
+          postData.mediaUrl = downloadURL;
+          postData.mediaType = 'video';
+        } else {
+          postData.img = downloadURL;
+        }
+      }
+
+      await addDoc(collection(db, collectionName), postData);
 
       // Reset fields
       setCaption('');
       setExtraText('');
-      setImageUri(null);
+      setAsset(null);
 
       Alert.alert('Post Created', 'Your post has been successfully created.', [
         {
@@ -87,13 +133,19 @@ export default function NewPostScreen() {
           />
         </View>
 
-        {imageUri && <Image source={{ uri: imageUri }} style={styles.previewImage} />}
+        {/* Render a preview if the asset is an image */}
+        {asset && asset.type === 'image' && (
+          <Image source={{ uri: asset.uri }} style={styles.previewImage} />
+        )}
+        {/* For video, you might later add a video preview component */}
+        {asset && asset.type === 'video' && (
+          <Text style={styles.videoInfo}>Video Selected</Text>
+        )}
 
-        <TouchableOpacity onPress={pickImage}>
-          <Text style={styles.addImageText}>Add image</Text>
+        <TouchableOpacity onPress={pickAsset}>
+          <Text style={styles.addImageText}>Add image or video</Text>
         </TouchableOpacity>
 
-       
         <TextInput
           style={styles.inputCaption}
           placeholder="What's new?"
@@ -147,6 +199,11 @@ const styles = StyleSheet.create({
     resizeMode: 'cover',
     borderRadius: 8,
     marginBottom: 16,
+  },
+  videoInfo: {
+    fontSize: 16,
+    marginBottom: 16,
+    color: '#555',
   },
   addImageText: {
     color: '#007AFF',

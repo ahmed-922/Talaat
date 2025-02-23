@@ -7,7 +7,9 @@ import TabBarBackground from '@/components/ui/TabBarBackground';
 import { Colors } from '@/constants/Colors';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import TrendsIcon from '@/components/svgs/trends';
-
+import SearchIcon from '@/components/svgs/searchIcon'; 
+import HomeIcon from '@/components/svgs/homeIcon';
+import CreateIcon from '@/components/svgs/createIcon';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
@@ -31,7 +33,7 @@ export default function TabLayout() {
         name="index"
         options={{
           title: '',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
+          tabBarIcon: ({ color }) => <HomeIcon width={24} height={24} fill={color} />,
         }}
       />
        <Tabs.Screen
@@ -39,7 +41,8 @@ export default function TabLayout() {
         options={{
           title: '',
           headerShown: false,
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="search.fill" color={color} />,
+          tabBarIcon: ({ color }) => 
+          <SearchIcon width={24} height={24} fill={color} />,
         }}
       />
       <Tabs.Screen
@@ -47,7 +50,8 @@ export default function TabLayout() {
         options={{
           title: '',
           headerShown: false,
-          tabBarIcon: ({ color }) => <IconSymbol name="add.fill" size={24} color={color} />,
+          tabBarIcon: ({ color }) => 
+            <CreateIcon width={24} height={24} fill={color} />
         }}
       />
      <Tabs.Screen

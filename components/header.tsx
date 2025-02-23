@@ -11,10 +11,12 @@ export default function Header() {
       {/* Use Link to navigate to the Chats page */}
       <View style={styles.header}>
         <Text style={styles.title}>TALAAT</Text>
+        <View style={{flexDirection: 'row', alignItems: 'center'}}>
         <Tags />
         <Link href="/chats">
-        <DM />
+        <DM width={30} height={30} color={"black"} />
       </Link>
+      </View>
       </View>
     </View>
   );

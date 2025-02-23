@@ -10,7 +10,13 @@
     "skipLibCheck": true,
     "paths": {
       "@/*": ["./*"]
-    }
+    },
+    "types": [
+      "react-native",
+      "react",
+      "react-native-gesture-handler",
+      "react-native-reanimated"
+    ]
   },
   "include": [
     "**/*.ts",

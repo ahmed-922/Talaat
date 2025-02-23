@@ -697,6 +697,6 @@ const styles = StyleSheet.create({
     fontSize: 20,
     lineHeight: 24,
     textAlign: 'center',
-    marginTop: -2, // Fine-tune arrow position
+    marginTop: -2
   },
 });
