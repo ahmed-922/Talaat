@@ -6,7 +6,7 @@ const PlayButtonIcon = (props) => (
     viewBox="0 0 384 512"
     width={props.width || 24}
     height={props.height || 24}
-    stroke="black"  // Black outline
+    stroke={props.stroke || "black"}
     {...props}
   >
     <Path

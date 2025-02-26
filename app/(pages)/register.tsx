@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Text, View, StyleSheet, TextInput, Button, Alert, Animated } from 'react-native';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { collection, query, where, getDocs, addDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, setDoc, doc } from 'firebase/firestore';
 import { auth, db } from '../../firebaseConfig'; // Adjust the path as necessary
 import { ImageBackground } from 'react-native';
 import { getStorage, ref, getDownloadURL } from 'firebase/storage';
@@ -34,12 +34,15 @@ export default function Signup() {
       const defaultImageRef = ref(storage, 'gs://talaat-c40db.firebasestorage.app/profilePictures/Default/defaultpfp.png');
       const defaultProfilePictureUrl = await getDownloadURL(defaultImageRef);
 
-      // Add user to Firestore with the default profile picture
-      await addDoc(collection(db, 'users'), {
-        uid: user.uid,
+      // Create user document with UID as document ID, but don't include uid in the data
+      await setDoc(doc(db, 'users', user.uid), {
         email: user.email,
         username: username,
         profilePicture: defaultProfilePictureUrl,
+        followers: [],
+        following: [],
+        bookmarks: [],
+        createdAt: new Date().toISOString(),
       });
 
       Alert.alert('User registered successfully!');

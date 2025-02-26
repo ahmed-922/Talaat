@@ -6,7 +6,7 @@ import {
   FlatList,
   TouchableOpacity,
   StyleSheet,
-  Image, 
+  Image,
 } from "react-native";
 import {
   doc,
@@ -17,8 +17,9 @@ import {
   updateDoc,
   arrayUnion,
   arrayRemove,
+  getDoc,
 } from "firebase/firestore";
-import { Link } from "expo-router"; 
+import { Link } from "expo-router";
 import { db, auth } from "../../firebaseConfig";
 
 const Search = () => {
@@ -32,7 +33,7 @@ const Search = () => {
     const fetchUsers = async () => {
       const snapshot = await getDocs(collection(db, "users"));
       const usersData = snapshot.docs.map((docSnap) => ({
-        id: docSnap.id,
+        id: docSnap.id, // document ID used directly
         ...docSnap.data(),
       }));
       setUsers(usersData);
@@ -51,24 +52,37 @@ const Search = () => {
   }, []);
 
   const fetchCurrentUserDocId = async (user: any) => {
-    const q = query(collection(db, "users"), where("uid", "==", user.uid));
-    const snapshot = await getDocs(q);
-    if (!snapshot.empty) {
-      setCurrentUserDocId(snapshot.docs[0].id);
+    try {
+      // Try to get the user document directly by ID
+      const userDocRef = doc(db, "users", user.uid);
+      const userDoc = await getDoc(userDocRef);
+
+      if (userDoc.exists()) {
+        setCurrentUserDocId(user.uid);
+      } else {
+        // Fallback to legacy query if direct lookup fails
+        const q = query(collection(db, "users"), where("uid", "==", user.uid));
+        const snapshot = await getDocs(q);
+        if (!snapshot.empty) {
+          setCurrentUserDocId(snapshot.docs[0].id);
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching current user doc ID:", error);
     }
   };
 
   const handleFollow = async (targetUserId: string, isCurrentlyFollowing: boolean) => {
     if (!currentUser) return;
 
-    // References to Firestore documents
+    // References to Firestore documents using document IDs
     const targetUserRef = doc(db, "users", targetUserId);
     const currentUserRef = doc(db, "users", currentUserDocId);
 
     if (isCurrentlyFollowing) {
       // Unfollow
       await updateDoc(targetUserRef, {
-        followers: arrayRemove(currentUser.uid),
+        followers: arrayRemove(currentUserDocId),
       });
       await updateDoc(currentUserRef, {
         following: arrayRemove(targetUserId),
@@ -76,7 +90,7 @@ const Search = () => {
     } else {
       // Follow
       await updateDoc(targetUserRef, {
-        followers: arrayUnion(currentUser.uid),
+        followers: arrayUnion(currentUserDocId),
       });
       await updateDoc(currentUserRef, {
         following: arrayUnion(targetUserId),
@@ -88,8 +102,8 @@ const Search = () => {
       prevUsers.map((user) => {
         if (user.id === targetUserId) {
           const updatedFollowers = isCurrentlyFollowing
-            ? user.followers?.filter((id: string) => id !== currentUser.uid)
-            : [...(user.followers || []), currentUser.uid];
+            ? user.followers?.filter((id: string) => id !== currentUserDocId)
+            : [...(user.followers || []), currentUserDocId];
           return { ...user, followers: updatedFollowers };
         }
         return user;
@@ -116,13 +130,14 @@ const Search = () => {
         data={filteredUsers}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => {
-          const isCurrentUser = item.uid === currentUser?.uid;
-          const isFollowing = item.followers?.includes(currentUser?.uid);
+          // Compare using document IDs directly
+          const isCurrentUser = item.id === currentUserDocId;
+          const isFollowing = item.followers?.includes(currentUserDocId);
 
           return (
             <View style={styles.userItem}>
               <Link
-                href={`/UserProfile?uid=${item.uid}`}
+                href={`/UserProfile?uid=${item.id}`}
                 style={styles.linkWrapper}
               >
                 <Image

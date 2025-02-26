@@ -17,13 +17,13 @@ import {
   getDocs,
   doc,
   updateDoc,
+  getDoc,
 } from 'firebase/firestore';
 import { db, auth } from '../../firebaseConfig';
 import { onAuthStateChanged } from 'firebase/auth';
-import { Link, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import Upload from '../../components/upload';
-// Import storage methods from Firebase Storage
 import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 export default function EditProfile() {
@@ -31,7 +31,6 @@ export default function EditProfile() {
   const [docId, setDocId] = useState<string | null>(null);
   const [name, setName] = useState('');
   const [bio, setBio] = useState('');
-  // This will now store the download URL from Firebase Storage
   const [profilePicture, setProfilePicture] = useState('');
   const [showUpload, setShowUpload] = useState(false);
   const colorScheme = useColorScheme();
@@ -47,41 +46,43 @@ export default function EditProfile() {
     return () => unsubscribe();
   }, []);
 
-  // Fetch the user doc by matching the "uid" field
   const fetchUserProfile = async (uid: string) => {
-    const userDocs = await getDocs(
-      query(collection(db, 'users'), where('uid', '==', uid))
-    );
+    try {
+      const userDocRef = doc(db, 'users', uid);
+      const userDoc = await getDoc(userDocRef);
 
-    if (!userDocs.empty) {
-      // Grab the first matching doc
-      const docSnap = userDocs.docs[0];
-      setDocId(docSnap.id); // Store the actual Firestore doc ID
-      const userData = docSnap.data();
-
-      setName(userData.username ?? '');
-      setBio(userData.bio ?? '');
-      setProfilePicture(userData.profilePicture ?? '');
+      if (userDoc.exists()) {
+        setDocId(uid);
+        const userData = userDoc.data();
+        setName(userData.username ?? '');
+        setBio(userData.bio ?? '');
+        setProfilePicture(userData.profilePicture ?? '');
+      } else {
+        const userDocs = await getDocs(
+          query(collection(db, 'users'), where('uid', '==', uid))
+        );
+        if (!userDocs.empty) {
+          const docSnap = userDocs.docs[0];
+          setDocId(docSnap.id);
+          const userData = docSnap.data();
+          setName(userData.username ?? '');
+          setBio(userData.bio ?? '');
+          setProfilePicture(userData.profilePicture ?? '');
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching user profile:", error);
     }
   };
 
-  // Function to handle image upload to Firebase Storage
   const handleImageUpload = async (uri: string) => {
     try {
-      // Convert image URI to blob
       const response = await fetch(uri);
       const blob = await response.blob();
-
-      // Create a reference in Firebase Storage using the user's UID
       const storage = getStorage();
       const storageRef = ref(storage, `profilePictures/${user.uid}.jpg`);
-
-      // Upload the file
       await uploadBytes(storageRef, blob);
-
-      // Retrieve the download URL
       const downloadUrl = await getDownloadURL(storageRef);
-      // Update state with the Firebase Storage URL
       setProfilePicture(downloadUrl);
     } catch (error) {
       Alert.alert('Error', 'Failed to upload image. Please try again.');
@@ -97,7 +98,6 @@ export default function EditProfile() {
         return;
       }
 
-      // Use the doc ID to update Firestore with the download URL of the image
       const userRef = doc(db, 'users', docId);
       await updateDoc(userRef, {
         username: name,
@@ -170,7 +170,6 @@ export default function EditProfile() {
         <Text style={styles.buttonText}>Save</Text>
       </TouchableOpacity>
 
-      {/* Modal for Upload.tsx */}
       <Modal visible={showUpload} transparent animationType="slide">
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
@@ -193,7 +192,6 @@ export default function EditProfile() {
   );
 }
 
-// Styles remain unchanged
 const styles = StyleSheet.create({
   container: {
     flex: 1,

@@ -139,12 +139,11 @@ export default function Messages() {
 
     const fetchRecipient = async () => {
       try {
-        const usersRef = collection(db, 'users');
-        const q = query(usersRef, where('uid', '==', recipientId));
-        const snapshot = await getDocs(q);
+        const userDocRef = doc(db, 'users', recipientId);
+        const userDocSnapshot = await getDoc(userDocRef);
 
-        if (!snapshot.empty) {
-          const userData = snapshot.docs[0].data();
+        if (userDocSnapshot.exists()) {
+          const userData = userDocSnapshot.data();
           setRecipient({
             uid: recipientId,
             username: userData.username || 'Unknown',
@@ -279,14 +278,13 @@ export default function Messages() {
                 (id: string) => id !== currentUser.uid
               );
               
-              // Query users collection where uid matches otherUserId
-              const usersRef = collection(db, 'users');
-              const userQuery = query(usersRef, where('uid', '==', otherUserId));
-              const userSnapshot = await getDocs(userQuery);
+              // Directly fetch user data by document ID
+              const userDocRef = doc(db, 'users', otherUserId);
+              const userDocSnapshot = await getDoc(userDocRef);
               
               let userData;
-              if (!userSnapshot.empty) {
-                userData = userSnapshot.docs[0].data();
+              if (userDocSnapshot.exists()) {
+                userData = userDocSnapshot.data();
               }
 
               return {
@@ -500,13 +498,13 @@ export default function Messages() {
             }
           >
             <Image
-  source={{
-    uri:
-      item.otherUser?.profilePicture ||
-      'https://example.com/default-avatar.png',
-  }}
-  style={styles.avatar}
-/>
+              source={{
+                uri:
+                  item.otherUser?.profilePicture ||
+                  'https://example.com/default-avatar.png',
+              }}
+              style={styles.avatar}
+            />
 
             <View style={styles.chatInfo}>
               <Text style={styles.username}>{item.otherUser.username}</Text>

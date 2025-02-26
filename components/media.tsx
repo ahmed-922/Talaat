@@ -10,6 +10,8 @@ import {
   Button,
   FlatList,
   Share as RNShare,
+  PanResponder,
+  Animated,
 } from "react-native";
 import {
   collection,
@@ -23,6 +25,8 @@ import {
   serverTimestamp,
   query,
   where,
+  getDoc,
+  orderBy,
 } from "firebase/firestore";
 import { db, auth } from "../firebaseConfig";
 import { Link } from "expo-router"; // Import Link for navigation
@@ -30,7 +34,6 @@ import Likes from "./svgs/likes";
 import Likesfill from "./svgs/likesfill";
 import Comments from "./svgs/comments";
 import Share from "./svgs/share";
-import TrendsIcon from "./svgs/trends";
 
 // --- Helper Functions for Timestamp Formatting ---
 
@@ -93,18 +96,19 @@ function PostTimestamp({ createdAt }: { createdAt: any }) {
 
 // --- Custom Hooks for Fetching User Data ---
 
-// Custom hook to fetch a username given the user's UID.
-function useUsername(uid: string) {
+// Custom hook to fetch a username directly by document ID
+function useUsername(docId: string) {
   const [username, setUsername] = useState("Unknown");
 
   useEffect(() => {
-    if (!uid) return;
+    if (!docId) return;
     async function fetchUsername() {
       try {
-        const qUsers = query(collection(db, "users"), where("uid", "==", uid));
-        const snapshot = await getDocs(qUsers);
-        if (!snapshot.empty) {
-          const userDoc = snapshot.docs[0];
+        // Direct document reference using docId
+        const userRef = doc(db, "users", docId);
+        const userDoc = await getDoc(userRef);
+        
+        if (userDoc.exists()) {
           const data = userDoc.data();
           setUsername(data.username || "Unknown");
         } else {
@@ -115,32 +119,33 @@ function useUsername(uid: string) {
       }
     }
     fetchUsername();
-  }, [uid]);
+  }, [docId]);
 
   return username;
 }
 
-// Custom hook to fetch a user's profile picture from Firestore
-function useProfilePicture(uid: string) {
+// Custom hook to fetch a user's profile picture directly by document ID
+function useProfilePicture(docId: string) {
   const [profilePicture, setProfilePicture] = useState("");
 
   useEffect(() => {
-    if (!uid) return;
+    if (!docId) return;
     async function fetchProfilePicture() {
       try {
-        const qUsers = query(collection(db, "users"), where("uid", "==", uid));
-        const snapshot = await getDocs(qUsers);
-        if (!snapshot.empty) {
-          const userDoc = snapshot.docs[0];
+        // Direct document reference using docId
+        const userRef = doc(db, "users", docId);
+        const userDoc = await getDoc(userRef);
+        
+        if (userDoc.exists()) {
           const data = userDoc.data();
-          setProfilePicture(data.profilePicture || ""); // Provide a fallback if needed
+          setProfilePicture(data.profilePicture || "");
         }
       } catch (error) {
         console.error("Error fetching profile picture:", error);
       }
     }
     fetchProfilePicture();
-  }, [uid]);
+  }, [docId]);
 
   return profilePicture;
 }
@@ -181,6 +186,20 @@ export default function Media() {
 
 // --- PostItem Component ---
 
+// Add interface for properly typed comments
+
+
+interface CommentWithUser {
+  id: string;
+  text: string;
+  userId: string;
+  createdAt: any;
+  user: {
+    username: string;
+    profilePicture: string;
+  };
+}
+
 function PostItem({ post }: { post: any }) {
   const currentUser = auth.currentUser;
   const userUID = currentUser?.uid;
@@ -211,25 +230,107 @@ function PostItem({ post }: { post: any }) {
   const [shareModalVisible, setShareModalVisible] = useState(false);
   const [optionsModalVisible, setOptionsModalVisible] = useState(false);
   const [newCommentText, setNewCommentText] = useState("");
-  const [comments, setComments] = useState<any[]>([]);
+  const [comments, setComments] = useState<CommentWithUser[]>([]);
 
-  // Real-time subscription for comments.
-  useEffect(() => {
-    const commentsRef = collection(db, "posts", post.id, "comments");
-    const unsubscribe = onSnapshot(commentsRef, (snapshot) => {
-      const data = snapshot.docs.map((docSnap) => ({
-        id: docSnap.id,
-        ...docSnap.data(),
-      }));
-      // Sort newest to oldest by createdAt
-      data.sort((a, b) => {
-        if (a.createdAt?.seconds && b.createdAt?.seconds) {
-          return b.createdAt.seconds - a.createdAt.seconds;
+  // Add new state for modal animation
+  const [modalYPosition] = useState(new Animated.Value(0));
+  const [isClosing, setIsClosing] = useState(false);
+  const [modalAnimation] = useState(new Animated.Value(0));
+  const [modalHeight, setModalHeight] = useState(0);
+
+  // Unified pan responder for modals
+  const panResponder = React.useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderMove: (_, gestureState) => {
+        modalYPosition.setValue(gestureState.dy);
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        if (gestureState.vy > 0.5 || gestureState.dy > 100) {
+          Animated.spring(modalYPosition, {
+            toValue: modalHeight,
+            useNativeDriver: true,
+            tension: 65,
+            friction: 12
+          }).start(() => {
+            closeModal();
+          });
+        } else {
+          Animated.spring(modalYPosition, {
+            toValue: 0,
+            useNativeDriver: true,
+            tension: 65,
+            friction: 12
+          }).start();
         }
-        return 0;
-      });
-      setComments(data);
+      }
+    })
+  ).current;
+
+  // Real-time subscription for comments using document ID
+  useEffect(() => {
+    if (!post.id) return;
+
+    const commentsRef = collection(db, "posts", post.id, "comments");
+    const commentsQuery = query(commentsRef, orderBy("createdAt", "desc"));
+    
+    const unsubscribe = onSnapshot(commentsQuery, async (snapshot) => {
+      try {
+        const commentsWithUserData = await Promise.all(
+          snapshot.docs.map(async (commentDoc) => {
+            const commentData = commentDoc.data();
+            
+            if (!commentData || !commentData.userId) {
+              console.log("Missing comment data:", commentDoc.id);
+              return null;
+            }
+
+            try {
+              const userRef = doc(db, "users", commentData.userId);
+              const userSnap = await getDoc(userRef);
+              
+              if (userSnap.exists()) {
+                const userData = userSnap.data();
+                return {
+                  id: commentDoc.id,
+                  text: commentData.text || '',
+                  userId: commentData.userId,
+                  createdAt: commentData.createdAt,
+                  user: {
+                    username: userData.username || "Unknown User",
+                    profilePicture: userData.profilePicture || "../photos/defaultpfp.png"
+                  }
+                };
+              }
+            } catch (userError) {
+              console.error("Error fetching user data for comment:", userError);
+            }
+            
+            return {
+              id: commentDoc.id,
+              text: commentData.text || '',
+              userId: commentData.userId,
+              createdAt: commentData.createdAt,
+              user: {
+                username: "Unknown User",
+                profilePicture: "../photos/defaultpfp.png"
+              }
+            };
+          })
+        );
+
+        const validComments = commentsWithUserData.filter(Boolean);
+        setComments(validComments);
+      } catch (error) {
+        console.error("Error fetching comments:", error);
+        setComments([]);
+      }
+    }, (error) => {
+      console.error("Error in comments listener:", error);
+      setComments([]);
     });
+    
     return () => unsubscribe();
   }, [post.id]);
 
@@ -248,17 +349,19 @@ function PostItem({ post }: { post: any }) {
     }
   };
 
-  // Handle adding a new comment.
+  // Handle adding a new comment with document ID
   const handleAddComment = async () => {
-    if (!userUID || !newCommentText.trim()) return;
+    if (!currentUser || !newCommentText.trim()) return;
     try {
       const commentsRef = collection(db, "posts", post.id, "comments");
       const newCommentDoc = doc(commentsRef);
+      
       await setDoc(newCommentDoc, {
-        username: currentUser?.displayName || "Anonymous",
+        userId: currentUser.uid,
         text: newCommentText,
-        createdAt: serverTimestamp(),
+        createdAt: serverTimestamp()
       });
+      
       setNewCommentText("");
       setCommentModalVisible(false);
     } catch (error) {
@@ -279,6 +382,67 @@ function PostItem({ post }: { post: any }) {
     }
   };
 
+  const renderComment = ({ item }: { item: CommentWithUser }) => (
+    <View style={styles.commentItem}>
+      <Image 
+        source={{ uri: item.user.profilePicture }} 
+        style={styles.commentUserImage} 
+      />
+      <View style={styles.commentContent}>
+        <Text style={styles.commentUsername}>{item.user.username}</Text>
+        <Text style={styles.commentText}>{item.text}</Text>
+        {item.createdAt && (
+          <Text style={styles.commentTime}>
+            {timeAgo(item.createdAt.toDate())}
+          </Text>
+        )}
+      </View>
+    </View>
+  );
+
+  // Handle modal visibility with animation
+  useEffect(() => {
+    if (commentModalVisible || shareModalVisible || optionsModalVisible) {
+      modalYPosition.setValue(0);
+      Animated.spring(modalAnimation, {
+        toValue: 1,
+        useNativeDriver: true,
+        tension: 65,
+        friction: 11
+      }).start();
+    } else {
+      Animated.spring(modalAnimation, {
+        toValue: 0,
+        useNativeDriver: true,
+        tension: 65,
+        friction: 11
+      }).start();
+    }
+  }, [commentModalVisible, shareModalVisible, optionsModalVisible]);
+
+  const closeModal = () => {
+    if (isClosing) return; // Avoid redundant triggers while closing
+    
+    setIsClosing(true);
+  
+    // Animate the modal sliding down
+    Animated.timing(modalYPosition, {
+      toValue: 1000, // Slide the modal down
+      duration: 200, // Adjust the duration to make it smoother
+      useNativeDriver: true,
+    }).start();
+  
+    // Delay hiding modal visibility until after the animation
+    setTimeout(() => {
+      setCommentModalVisible(false);
+      setShareModalVisible(false);
+      setOptionsModalVisible(false);
+      setIsClosing(false);
+    }, 200); // Match the duration of the slide-down animation
+  };
+  
+
+  
   return (
     <View style={styles.postContainer}>
       {/* Top Bar: Clickable user info wrapped in a Link */}
@@ -290,113 +454,143 @@ function PostItem({ post }: { post: any }) {
           </View>
         </Link>
         <TouchableOpacity onPress={() => setOptionsModalVisible(true)}>
-          <Text style={styles.optionsText}>. . .</Text>
+          <Text style={styles.optionsText}>...</Text>
         </TouchableOpacity>
       </View>
 
-      {/* Post image */}
-      {localPost.img ? (
-        <Image source={{ uri: localPost.img }} style={styles.postImage} />
-      ) : null}
+      {/* Make the post content clickable */}
+      <Link href={`../(pages)/post?id=${post.id}`} asChild>
+        <TouchableOpacity>
+          {/* Post image */}
+          {localPost.img ? (
+            <Image source={{ uri: localPost.img }} style={styles.postImage} />
+          ) : null}
 
-      {/* Timestamp */}
-      <PostTimestamp createdAt={localPost.createdAt} />
+          {/* Timestamp */}
+          <PostTimestamp createdAt={localPost.createdAt} />
 
-      {/* Caption */}
-      <Text style={styles.caption}>{localPost.caption}</Text>
+          {/* Caption */}
+          <Text style={styles.caption}>{localPost.caption}</Text>
+        </TouchableOpacity>
+      </Link>
 
       {/* Bottom Bar with Like, Comment & Share */}
       <View style={styles.bottomBar}>
         <TouchableOpacity onPress={handleLikeToggle}>
           <View style={{ flexDirection: "row", alignItems: "center" }}>
             {alreadyLiked ? <Likesfill /> : <Likes />}
-            <Text style={styles.buttonText}>{localPost.likes?.length || 0}</Text>
+            <Text style={styles.buttonText}>{localPost.likes?.length || ''}</Text>
           </View>
         </TouchableOpacity>
         <TouchableOpacity onPress={() => setCommentModalVisible(true)}>
-          <Text style={styles.buttonText2}><Comments/></Text>
+          <Text style={styles.buttonText2}><Comments fill='white' stroke="black"/></Text>
         </TouchableOpacity>
         <TouchableOpacity onPress={() => setShareModalVisible(true)}>
           <Text style={styles.buttonText2}><Share/></Text>
         </TouchableOpacity>
       </View>
 
-      {/* Comments Modal */}
+      {/* Unified Modal for Comments, Share, and Options */}
       <Modal
-        visible={commentModalVisible}
-        animationType="slide"
+        visible={commentModalVisible || shareModalVisible || optionsModalVisible}
+        animationType="none"
         transparent={true}
-        onRequestClose={() => setCommentModalVisible(false)}
+        onRequestClose={closeModal}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
-            <Text style={styles.modalTitle}>Comments</Text>
-            {comments.length > 0 ? (
-              <FlatList
-                data={comments}
-                keyExtractor={(item) => item.id}
-                renderItem={({ item }) => (
-                  <View style={styles.commentItem}>
-                    <Text style={styles.commentUser}>{item.username}:</Text>
-                    <Text style={styles.commentText}>{item.text}</Text>
-                  </View>
-                )}
-              />
-            ) : (
-              <Text style={{ marginBottom: 10 }}>No comments yet</Text>
-            )}
-            <TextInput
-              style={styles.input}
-              placeholder="Write a comment..."
-              value={newCommentText}
-              onChangeText={setNewCommentText}
-            />
-            <Button title="Add Comment" onPress={handleAddComment} />
-            <Button title="Close" onPress={() => setCommentModalVisible(false)} color="red" />
-          </View>
-        </View>
-      </Modal>
+          <Animated.View 
+            style={[
+              styles.modalContainer,
+              {
+                transform: [{
+                  translateY: modalYPosition.interpolate({
+                    inputRange: [0, modalHeight],
+                    outputRange: [0, modalHeight],
+                    extrapolate: 'clamp'
+                  })
+                }],
+                opacity: modalAnimation
+              }
+            ]}
+            onLayout={(event) => {
+              setModalHeight(event.nativeEvent.layout.height);
+            }}
+          >
+            {/* Draggable Handle with visual feedback */}
+            <View {...panResponder.panHandlers}>
+              <View style={styles.modalDragHandle} />
+            </View>
 
-      {/* Share Modal */}
-      <Modal
-        visible={shareModalVisible}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShareModalVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
-            <Text style={styles.modalTitle}>Share Post</Text>
-            <Text>Share this post with your friends!</Text>
-            <Button title="Share Now" onPress={handleShare} />
-            <Button title="Cancel" onPress={() => setShareModalVisible(false)} color="red" />
-          </View>
-        </View>
-      </Modal>
-
-      {/* Options Modal */}
-      <Modal
-        visible={optionsModalVisible}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setOptionsModalVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
-            <Text style={styles.modalTitle}>Post Options</Text>
-            {userUID === localPost.byUser && (
-              <TouchableOpacity style={styles.optionItem}>
-                <Text>Delete Post (not implemented)</Text>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>
+                {commentModalVisible ? `Comments (${comments.length})` : shareModalVisible ? 'Share Post' : 'Post Options'}
+              </Text>
+              <TouchableOpacity 
+                style={styles.closeButton}
+                onPress={closeModal}
+              >
+                <Text style={styles.closeButtonText}>×</Text>
               </TouchableOpacity>
+            </View>
+
+            {commentModalVisible && (
+              <>
+                <FlatList
+                  data={comments}
+                  renderItem={renderComment}
+                  keyExtractor={(item) => item.id}
+                  style={styles.commentsList}
+                  ListEmptyComponent={
+                    <Text style={styles.noCommentsText}>No comments yet</Text>
+                  }
+                />
+                <View style={styles.commentInputContainer}>
+                  <TextInput
+                    style={styles.commentInput}
+                    placeholder="Write a comment..."
+                    value={newCommentText}
+                    onChangeText={setNewCommentText}
+                    multiline
+                  />
+                  <TouchableOpacity
+                    style={[
+                      styles.commentButton,
+                      !newCommentText.trim() && styles.commentButtonDisabled
+                    ]}
+                    onPress={handleAddComment}
+                    disabled={!newCommentText.trim()}
+                  >
+                    <Text style={styles.commentButtonText}>Post</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
             )}
-            <TouchableOpacity style={styles.optionItem}>
-              <Text>Report Post (not implemented)</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.optionItem}>
-              <Text>Copy Link (not implemented)</Text>
-            </TouchableOpacity>
-            <Button title="Close" onPress={() => setOptionsModalVisible(false)} color="red" />
-          </View>
+
+            {shareModalVisible && (
+              <View style={styles.modalContent}>
+                <Text>Share this post with your friends!</Text>
+                <Button title="Share Now" onPress={handleShare} />
+                <Button title="Cancel" onPress={closeModal} color="red" />
+              </View>
+            )}
+
+            {optionsModalVisible && (
+              <View style={styles.modalContent}>
+                {userUID === localPost.byUser && (
+                  <TouchableOpacity style={styles.optionItem}>
+                    <Text>Delete Post (not implemented)</Text>
+                  </TouchableOpacity>
+                )}
+                <TouchableOpacity style={styles.optionItem}>
+                  <Text>Report Post (not implemented)</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.optionItem}>
+                  <Text>Copy Link (not implemented)</Text>
+                </TouchableOpacity>
+                <Button title="Close" onPress={closeModal} color="red" />
+              </View>
+            )}
+          </Animated.View>
         </View>
       </Modal>
     </View>
@@ -481,11 +675,12 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   modalContainer: {
-    marginHorizontal: 20,
-    backgroundColor: "#fff",
-    borderRadius: 8,
-    padding: 16,
-    maxHeight: "80%",
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingTop: 10,
+    height: '80%', // Make modal taller
+    marginTop: 'auto', // Push to bottom
   },
   modalTitle: {
     fontSize: 18,
@@ -500,15 +695,55 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   commentItem: {
-    flexDirection: "row",
-    marginBottom: 5,
+    flexDirection: 'row',
+    padding: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
   },
-  commentUser: {
-    fontWeight: "bold",
-    marginRight: 5,
+  commentUserImage: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    marginRight: 10,
+  },
+  commentContent: {
+    flex: 1,
+  },
+  commentUsername: {
+    fontWeight: 'bold',
+    fontSize: 14,
+    marginBottom: 4,
   },
   commentText: {
-    flex: 1,
+    fontSize: 14,
+    marginBottom: 4,
+  },
+  commentTime: {
+    fontSize: 12,
+    color: '#666',
+  },
+  commentsList: {
+    flex: 1, // Take remaining space
+  },
+  noCommentsText: {
+    textAlign: 'center',
+    padding: 20,
+    color: '#666',
+  },
+  commentInputContainer: {
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+    padding: 10,
+    marginTop: 'auto',
+  },
+  commentInput: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 20,
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    maxHeight: 100,
+    marginBottom: 10,
   },
   optionItem: {
     paddingVertical: 8,
@@ -520,5 +755,48 @@ const styles = StyleSheet.create({
   buttonText2: {
     height: 24,
     width: 24
-  }
+  },
+  commentButton: {
+    backgroundColor: '#007bff',
+    borderRadius: 20,
+    paddingVertical: 8,
+    paddingHorizontal: 15,
+    alignItems: 'center',
+  },
+  commentButtonDisabled: {
+    backgroundColor: '#ccc',
+  },
+  commentButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between', // Changed from center to space-between
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  closeButton: {
+    padding: 8,
+    position: 'absolute',
+    right: 10,
+    top: 8,
+  },
+  closeButtonText: {
+    fontSize: 24,
+    color: '#999',
+    fontWeight: 'bold',
+  },
+  modalDragHandle: {
+    width: 40,
+    height: 5,
+    backgroundColor: '#ccc',
+    borderRadius: 3,
+    alignSelf: 'center',
+    marginVertical: 8,
+    opacity: 0.8, // Slightly transparent for better visual feedback
+  },
 });

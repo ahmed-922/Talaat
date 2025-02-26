@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, Image, TouchableOpacity, StyleSheet, useColorScheme } from 'react-native';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, doc, getDoc } from 'firebase/firestore';
 import { db, auth } from '../../firebaseConfig';
 import { onAuthStateChanged } from 'firebase/auth';
 import { Link } from 'expo-router';
@@ -18,34 +18,41 @@ export default function UserProfile() {
   const colorScheme = useColorScheme();
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       if (currentUser) {
         setUser(currentUser);
-        fetchUserProfile(currentUser.uid);
-        fetchUserPostsCount(currentUser.uid);
+        fetchUserProfile(currentUser.uid); // Fetch user profile directly using UID
       } else {
-        console.log('User is not logged in');
+        console.log("User is not logged in");
       }
     });
+
     return () => unsubscribe();
   }, []);
 
-  const fetchUserProfile = async (uid) => {
-    const userDoc = await getDocs(query(collection(db, 'users'), where('uid', '==', uid)));
-    if (!userDoc.empty) {
-      const userData = userDoc.docs[0].data();
-      setName(userData.username);
-      setProfilePicture(userData.profilePicture || '');
-      setBio(userData.bio || '');
-      if (userData.followers) {
-        setFollowersCount(userData.followers.length);
+  // Fetch the user profile from Firestore if document ID matches currentUser.uid
+  const fetchUserProfile = async (userId) => {
+    try {
+      const userDocRef = doc(db, 'users', userId); // Directly reference by ID
+      const userDocSnap = await getDoc(userDocRef);
+
+      if (userDocSnap.exists()) {
+        const userData = userDocSnap.data();
+        setName(userData.username || '');
+        setProfilePicture(userData.profilePicture || '');
+        setBio(userData.bio || '');
+        setFollowersCount(userData.followers?.length || 0);
+        setFollowingCount(userData.following?.length || 0);
+      } else {
+        console.log('No matching user document found');
       }
-      if (userData.following) {
-        setFollowingCount(userData.following.length);
-      }
+    } catch (error) {
+      console.error('Error fetching user profile:', error);
     }
   };
 
+
+  
   const fetchUserPostsCount = async (uid) => {
     try {
       const postsQuery = query(collection(db, 'posts'), where('byUser', '==', uid));

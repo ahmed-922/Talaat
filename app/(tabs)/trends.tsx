@@ -2,16 +2,77 @@ import { useEffect, useState, useRef, useCallback } from 'react';
 import { useEvent } from 'expo';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { StyleSheet, View, Button, FlatList, Dimensions, ScrollView, TouchableOpacity, Text, Platform, Modal, TextInput, Share, Image } from 'react-native';
-import { collection, getDocs, doc, updateDoc, arrayUnion, arrayRemove, addDoc, serverTimestamp, onSnapshot, query, orderBy, where } from 'firebase/firestore';
+import { collection, getDocs, doc, updateDoc, arrayUnion, arrayRemove, addDoc, serverTimestamp, onSnapshot, query, orderBy, where, getDoc, setDoc, deleteDoc } from 'firebase/firestore';
 import { db, auth } from '../../firebaseConfig';
 import { ViewToken } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Link, Stack } from 'expo-router';
 import PlayIcon from '../../components/svgs/playIcon';
-import Likes from '../../components/svgs/likes';
-import Likesfill from '../../components/svgs/likesfill';
+import Likes from '../../components/svgs/likesfill';
 import Comments from '../../components/svgs/comments';
 import ShareIcon from '../../components/svgs/share';
+import EyeOutlineIcon from '../../components/svgs/location';
+import Vinyl from '../../components/svgs/vinyl';
+
+// Rename the import to match how it's used in the component
+const LocationIcon = EyeOutlineIcon;
+
+function timeAgo(date: Date) {
+  const now = new Date();
+  const secondsElapsed = Math.floor((now.getTime() - date.getTime()) / 1000);
+
+  if (secondsElapsed < 60) {
+    return "Just now";
+  }
+
+  const minutes = Math.floor(secondsElapsed / 60);
+  if (minutes < 60) {
+    return minutes === 1 ? "1m ago" : `${minutes}m ago`;
+  }
+
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) {
+    return hours === 1 ? "1h ago" : `${hours}h ago`;
+  }
+
+  const days = Math.floor(hours / 24);
+  if (days < 7) {
+    return days === 1 ? "1d ago" : `${days}d ago`;
+  }
+
+  const weeks = Math.floor(days / 7);
+  if (weeks < 4) {
+    return weeks === 1 ? "1w ago" : `${weeks}w ago`;
+  }
+
+  const months = Math.floor(days / 30);
+  if (months < 12) {
+    return months === 1 ? "1mo ago" : `${months}mo ago`;
+  }
+
+  const years = Math.floor(months / 12);
+  return years === 1 ? "1y ago" : `${years}y ago`;
+}
+
+function formatTime(date: Date) {
+  // 24-hour format with seconds
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+  const seconds = String(date.getSeconds()).padStart(2, "0");
+  return `${hours}:${minutes}`;
+}
+
+// --- Component to Display the Post Timestamp ---
+
+function PostTimestamp({ createdAt }: { createdAt: any }) {
+  if (!createdAt || typeof createdAt.toDate !== "function") return null;
+  const date = createdAt.toDate();
+  return (
+    <Text style={styles.timestamp}>
+      {timeAgo(date)} at {formatTime(date)}
+    </Text>
+  );
+}
 
 const { height, width } = Dimensions.get("window");
 
@@ -25,7 +86,12 @@ const VideoItem = ({ item, isVisible, playerRef }: { item: any, isVisible: boole
   const [newComment, setNewComment] = useState('');
   const currentUser = auth.currentUser;
   const [uploaderData, setUploaderData] = useState<any>(null);
+  const [uploaderUsername, setUploaderUsername] = useState('');
+  const [videoDate, setVideoDate] = useState('');
+  const [caption, setCaption] = useState('');
+  const [extraText, setExtraText] = useState('');
   const [isPlayerMounted, setIsPlayerMounted] = useState(true);
+  const [isBookmarked, setIsBookmarked] = useState(false);
   
   const player = useVideoPlayer(item.mediaUrl, async player => {
     if (!isPlayerMounted) return;
@@ -77,12 +143,60 @@ const VideoItem = ({ item, isVisible, playerRef }: { item: any, isVisible: boole
       }
     });
 
-    const unsubscribeComments = onSnapshot(commentsQuery, (snapshot) => {
-      const commentsData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      setComments(commentsData);
+    const unsubscribeComments = onSnapshot(commentsQuery, async (snapshot) => {
+      try {
+        const commentsWithUserData = await Promise.all(
+          snapshot.docs.map(async (commentDoc) => {
+            const commentData = commentDoc.data();
+            
+            if (!commentData || !commentData.userId) {
+              console.log("Missing comment data:", commentDoc.id);
+              return null;
+            }
+
+            try {
+              const userRef = doc(db, "users", commentData.userId);
+              const userSnap = await getDoc(userRef);
+              
+              if (userSnap.exists()) {
+                const userData = userSnap.data();
+                return {
+                  id: commentDoc.id,
+                  text: commentData.text || '',
+                  userId: commentData.userId,
+                  createdAt: commentData.createdAt,
+                  user: {
+                    username: userData.username || "Unknown User",
+                    profilePicture: userData.profilePicture || "../photos/defaultpfp.png"
+                  }
+                };
+              }
+            } catch (userError) {
+              console.error("Error fetching user data for comment:", userError);
+            }
+            
+            return {
+              id: commentDoc.id,
+              text: commentData.text || '',
+              userId: commentData.userId,
+              createdAt: commentData.createdAt,
+              user: {
+                username: "Unknown User",
+                profilePicture: "../photos/defaultpfp.png"
+              }
+            };
+          })
+        );
+
+        const validComments = commentsWithUserData.filter(Boolean);
+        setComments(validComments);
+      } catch (error) {
+        console.error("Error fetching comments:", error);
+        setComments([]);
+      }
+    }, (error) => {
+      console.error("Error in comments listener:", error);
+      setComments([]);
     });
 
     return () => {
@@ -130,11 +244,12 @@ const VideoItem = ({ item, isVisible, playerRef }: { item: any, isVisible: boole
 
     const fetchUploaderData = async () => {
       try {
-        const usersRef = collection(db, 'users');
-        const q = query(usersRef, where('uid', '==', item.byUser));
-        const snapshot = await getDocs(q);
-        if (!snapshot.empty) {
-          setUploaderData(snapshot.docs[0].data());
+        const userRef = doc(db, 'users', item.byUser);
+        const userSnap = await getDoc(userRef);
+        if (userSnap.exists()) {
+          const userData = userSnap.data();
+          setUploaderData(userData);
+          setUploaderUsername(userData.username || 'Unknown');
         }
       } catch (error) {
         console.error('Error fetching uploader data:', error);
@@ -143,6 +258,47 @@ const VideoItem = ({ item, isVisible, playerRef }: { item: any, isVisible: boole
 
     fetchUploaderData();
   }, [item.byUser]);
+
+  // Fetch video date, caption, and extra text
+  useEffect(() => {
+    if (!item.id) return;
+
+    const fetchVideoDetails = async () => {
+      try {
+        const videoRef = doc(db, 'videos', item.id);
+        const videoSnap = await getDoc(videoRef);
+        if (videoSnap.exists()) {
+          const videoData = videoSnap.data();
+          setVideoDate(timeAgo(videoData.createdAt.toDate()));
+          setCaption(videoData.caption || '');
+          setExtraText(videoData.extraText || '');
+        }
+      } catch (error) {
+        console.error('Error fetching video details:', error);
+      }
+    };
+
+    fetchVideoDetails();
+  }, [item.id]);
+
+  // Check if video is bookmarked when component mounts
+  useEffect(() => {
+    if (!currentUser || !item.id) return;
+    
+    const checkBookmarkStatus = async () => {
+      try {
+        const userRef = doc(db, 'users', currentUser.uid);
+        const bookmarksRef = collection(userRef, 'bookmarks');
+        const bookmarkQuery = query(bookmarksRef, where('videoId', '==', item.id));
+        const bookmarkSnapshot = await getDocs(bookmarkQuery);
+        setIsBookmarked(!bookmarkSnapshot.empty);
+      } catch (error) {
+        console.error("Error checking bookmark status:", error);
+      }
+    };
+
+    checkBookmarkStatus();
+  }, [currentUser, item.id]);
 
   const togglePlayPause = async () => {
     if (!player || !isPlayerMounted) return;
@@ -191,7 +347,6 @@ const VideoItem = ({ item, isVisible, playerRef }: { item: any, isVisible: boole
       await addDoc(commentsRef, {
         text: newComment,
         userId: currentUser.uid,
-        username: currentUser.displayName || 'Anonymous',
         createdAt: serverTimestamp()
       });
       setNewComment('');
@@ -211,46 +366,112 @@ const VideoItem = ({ item, isVisible, playerRef }: { item: any, isVisible: boole
     }
   };
 
+  const handleBookmark = async () => {
+    if (!currentUser || !item.id) return;
+
+    try {
+      const userRef = doc(db, 'users', currentUser.uid);
+      const bookmarksRef = collection(userRef, 'bookmarks');
+      
+      if (isBookmarked) {
+        const bookmarkQuery = query(bookmarksRef, where('videoId', '==', item.id));
+        const bookmarkSnapshot = await getDocs(bookmarkQuery);
+        
+        if (!bookmarkSnapshot.empty) {
+          await deleteDoc(doc(bookmarksRef, bookmarkSnapshot.docs[0].id));
+        }
+        
+        setIsBookmarked(false);
+        console.log('Video removed from bookmarks');
+      } else {
+        await addDoc(bookmarksRef, {
+          videoId: item.id,
+          createdAt: serverTimestamp()
+        });
+        
+        setIsBookmarked(true);
+        console.log('Video added to bookmarks');
+      }
+    } catch (error) {
+      console.error("Error updating bookmark:", error);
+    }
+  };
+
+  const renderComment = ({ item }: { item: CommentWithUser }) => (
+    <View style={styles.commentItem}>
+      <Image 
+        source={{ uri: item.user.profilePicture }} 
+        style={styles.commentUserImage} 
+      />
+      <View style={styles.commentContent}>
+        <Text style={styles.commentUsername}>{item.user.username}</Text>
+        <Text style={styles.commentText}>{item.text}</Text>
+        {item.createdAt && (
+          <Text style={styles.commentTime}>
+            {timeAgo(item.createdAt.toDate())}
+          </Text>
+        )}
+      </View>
+    </View>
+  );
+
   return (
     <View style={styles.videoContainer}>
       <VideoView style={styles.fullscreenVideo} player={player} nativeControls={false} contentFit="contain" />
       <TouchableOpacity style={styles.videoOverlay} onPress={togglePlayPause} activeOpacity={1}>
         {isPaused && (
           <View style={styles.controlsContainer}>
-            <Text style={styles.controlButtonText}><PlayIcon width={65} height={65} fill={'white'} opacity={1}/></Text>
+            <Text style={styles.controlButtonText}><PlayIcon width={62} height={62} fill={'white'} opacity={0.35} stroke={'none'}/></Text>
           </View>
         )}
       </TouchableOpacity>
 
-      {/* User Profile Button */}
-      {item.byUser && (
-        <Link href={`/UserProfile?uid=${item.byUser}`} asChild>
-          <TouchableOpacity style={styles.userProfileButton}>
-            <Image
-              source={{ 
-                uri: uploaderData?.profilePicture || '../photos/defaultpfp.png'
-              }}
-              style={styles.userProfileImage}
-            />
-          </TouchableOpacity>
-        </Link>
-      )}
-
       {/* Social Interaction Buttons */}
       <View style={styles.socialButtons}>
+      
+        {/* User Profile Button */}
+        {item.byUser && (
+                <Link href={`/UserProfile?uid=${item.byUser}`} asChild>
+                   <TouchableOpacity onPress={handleLike} style={styles.socialButton}>
+                    <Image
+                      source={{ 
+                        uri: uploaderData?.profilePicture || '../photos/defaultpfp.png'
+                      }}
+                      style={styles.userProfileImage}
+                    />
+                  </TouchableOpacity>
+                </Link>
+              )}
+
         <TouchableOpacity onPress={handleLike} style={styles.socialButton}>
-          {isLiked ? <Likesfill width={28} height={28} fill="#FF4B4B" /> : <Likes width={28} height={28} fill="#FFFFFF" />}
+          {isLiked ? <Likes width={32} height={32} fill="#FF4B4B" /> : <Likes width={35} height={35} fill="#FFFFFF" />}
           <Text style={styles.socialButtonText}>{likes.length}</Text>
         </TouchableOpacity>
 
         <TouchableOpacity onPress={() => setCommentModalVisible(true)} style={styles.socialButton}>
-          <Comments width={28} height={28} fill="#FFFFFF" />
+          <Comments width={35} height={35} fill="#FFFFFF" />
           <Text style={styles.socialButtonText}>{comments.length}</Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity onPress={handleBookmark} style={styles.socialButton}> 
+        {isBookmarked ? <LocationIcon width={35} height={35} fill="red" /> : <LocationIcon width={35} height={35} fill="#FFF" />}
         </TouchableOpacity>
 
         <TouchableOpacity onPress={handleShare} style={styles.socialButton}>
-          <ShareIcon width={28} height={28} fill="#FFFFFF" />
+          <ShareIcon width={35} height={35} fill='white' stroke="none" strokeWidth="0" />
         </TouchableOpacity>
+        
+        <TouchableOpacity onPress={handleShare} style={styles.socialButton}>
+          <Vinyl width={50} height={40} fill='white' stroke="black" strokeWidth="20" />
+        </TouchableOpacity>
+
+      </View>
+
+      {/* Video Details */}
+      <View style={styles.videoDetails}>
+        <View style={{flexDirection:'row', alignItems:'center' }}><Text style={styles.uploaderUsername}>{uploaderUsername}</Text><Text style={styles.videoDate}>{videoDate}</Text></View>
+        <Text style={styles.caption}>{caption}</Text>
+        <Text style={styles.extraText}>{extraText}</Text>
       </View>
 
       {/* Comments Modal */}
@@ -272,13 +493,11 @@ const VideoItem = ({ item, isVisible, playerRef }: { item: any, isVisible: boole
             <FlatList
               data={comments}
               keyExtractor={(item) => item.id}
-              renderItem={({ item }) => (
-                <View style={styles.commentItem}>
-                  <Text style={styles.commentUsername}>{item.username}</Text>
-                  <Text style={styles.commentText}>{item.text}</Text>
-                </View>
-              )}
+              renderItem={renderComment}
               style={styles.commentsList}
+              ListEmptyComponent={
+                <Text style={styles.noCommentsText}>No comments yet</Text>
+              }
             />
 
             <View style={styles.commentInputContainer}>
@@ -403,6 +622,7 @@ export default function VideoScreen() {
           <View style={styles.videoWrapper}>
             <View style={styles.videoInnerWrapper}>
               <VideoItem item={item} isVisible={item.id === visibleItem} playerRef={playerRef} />
+             
             </View>
           </View>
         )}
@@ -448,7 +668,7 @@ const styles = StyleSheet.create({
   },
   videoContainer: {
     height: height,
-    width: width,
+    width: width, 
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -518,18 +738,18 @@ const styles = StyleSheet.create({
   },
   socialButton: {
     alignItems: 'center',
-    marginBottom: 20,
+    margin: 0,
     borderRadius: 20,
     padding: 8,
-    width: 45,
-    height: 55,
+    width: 54,
+    height: 54,
     justifyContent: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.35)',
+    backgroundColor: 'transparent',
   },
   socialButtonText: {
     color: '#FFFFFF',
-    marginTop: 5,
-    fontSize: 14,
+    marginTop: 1,
+    fontSize: 13,
     fontWeight: 'bold',
   },
   modalOverlay: {
@@ -616,8 +836,81 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   userProfileImage: {
-    width: '100%',
-    height: '100%',
+    width: 50,
+    height: 50,
     borderRadius: 25,
+    borderWidth: 1,
+    borderColor: 'white'
+  },
+  bookmarkModalContainer: {
+    backgroundColor: 'white',
+    borderRadius: 10,
+    padding: 20,
+    width: '80%',
+    alignSelf: 'center',
+    marginTop: 'auto',
+    marginBottom: 'auto',
+  },
+  bookmarkModalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  bookmarkModalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  bookmarkModalButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 5,
+    flex: 1,
+    marginHorizontal: 5,
+  },
+  bookmarkModalCancelButton: {
+    backgroundColor: '#f0f0f0',
+  },
+  bookmarkModalConfirmButton: {
+    backgroundColor: '#007AFF',
+  },
+  bookmarkModalCancelText: {
+    color: '#333',
+    textAlign: 'center',
+    fontWeight: '600',
+  },
+  bookmarkModalConfirmText: {
+    color: 'white',
+    textAlign: 'center',
+    fontWeight: '600',
+  },
+  videoDetails: {
+    position: 'absolute',
+    bottom: 85,
+    left: 0,
+    right: 70,
+    padding: 10,
+   
+  },
+  uploaderUsername: {
+    color: 'white',
+    fontSize: 19,
+    fontWeight: 'bold',
+  },
+  videoDate: {
+    color: 'white',
+    fontSize: 12,
+    marginTop: 7,
+    marginLeft: 3
+  },
+  caption: {
+    color: 'white',
+    fontSize: 14,
+    marginTop: 5,
+  },
+  extraText: {
+    color: 'white',
+    fontSize: 14,
+    marginTop: 5,
   },
 });

@@ -16,10 +16,10 @@ import {
   query,
   where,
   getDocs,
-  writeBatch,
+  updateDoc,
   arrayUnion,
   arrayRemove,
-  increment,
+  getDoc,
 } from "firebase/firestore";
 import { db } from "../../firebaseConfig";
 
@@ -55,36 +55,11 @@ export default function UserProfile() {
         router.replace("/login");
       } else {
         setCurrentUser(user);
+        setCurrentUserDocId(user.uid);
       }
     });
     return () => unsubscribe();
   }, []);
-
-  /**
-   * 2) Once we have currentUser, fetch the Firestore doc ID
-   *    for the current user (so we can update their "following" later).
-   */
-  useEffect(() => {
-    if (!currentUser) return;
-
-    const fetchCurrentUserDocId = async () => {
-      try {
-        const usersRef = collection(db, "users");
-        const q = query(usersRef, where("uid", "==", currentUser.uid));
-        const snapshot = await getDocs(q);
-
-        if (!snapshot.empty) {
-          setCurrentUserDocId(snapshot.docs[0].id);
-        } else {
-          console.warn("No Firestore doc found for the current user!");
-        }
-      } catch (error) {
-        console.error("Error fetching current user doc ID:", error);
-      }
-    };
-
-    fetchCurrentUserDocId();
-  }, [currentUser]);
 
   /**
    * 3) If the route's uid is the same as currentUser.uid, redirect to /user.
@@ -109,33 +84,55 @@ export default function UserProfile() {
     const fetchUser = async () => {
       setLoading(true);
       try {
-        const usersRef = collection(db, "users");
-        const q = query(usersRef, where("uid", "==", uid));
-        const snapshot = await getDocs(q);
-
-        if (!snapshot.empty) {
-          const userDoc = snapshot.docs[0];
-          const data = userDoc.data();
-
+        // First try to get the user document directly by ID
+        const userDocRef = doc(db, "users", uid as string);
+        const userDocSnapshot = await getDoc(userDocRef);
+        
+        if (userDocSnapshot.exists()) {
+          const data = userDocSnapshot.data();
+          
           // Store the doc ID for the visited user
-          const docId = userDoc.id;
           setUserData({
             ...data,
-            docId: docId,
+            docId: uid,
           });
-
-          // --- ONLY THIS LINE CHANGED ---
+          
           // Instead of data.followersCount, we use the actual array length:
           setFollowersCount(data.followers?.length || 0);
-
           setFollowingCount(data.followingCount || 0);
           // Optionally, use stored postsCount as a starting value
           setPostsCount(data.postsCount || 0);
-
+          
           // Check if current user is in the target user's followers array
           setIsFollowing(data.followers?.includes(currentUser.uid));
         } else {
-          setUserData(null);
+          // Fallback to legacy query if direct lookup fails
+          const usersRef = collection(db, "users");
+          const q = query(usersRef, where("uid", "==", uid));
+          const snapshot = await getDocs(q);
+
+          if (!snapshot.empty) {
+            const userDoc = snapshot.docs[0];
+            const data = userDoc.data();
+
+            // Store the doc ID for the visited user
+            const docId = userDoc.id;
+            setUserData({
+              ...data,
+              docId: docId,
+            });
+
+            // Instead of data.followersCount, we use the actual array length:
+            setFollowersCount(data.followers?.length || 0);
+            setFollowingCount(data.followingCount || 0);
+            // Optionally, use stored postsCount as a starting value
+            setPostsCount(data.postsCount || 0);
+
+            // Check if current user is in the target user's followers array
+            setIsFollowing(data.followers?.includes(currentUser.uid));
+          } else {
+            setUserData(null);
+          }
         }
       } catch (error) {
         console.error("Error fetching user profile:", error);
@@ -155,10 +152,8 @@ export default function UserProfile() {
 
     const fetchPostsCount = async () => {
       try {
-        const postsQuery = query(
-          collection(db, "posts"),
-          where("byUser", "==", userData.uid)
-        );
+        const postsRef = collection(db, "posts");
+        const postsQuery = query(postsRef, where("byUser", "==", userData.docId));
         const postsSnapshot = await getDocs(postsQuery);
         setPostsCount(postsSnapshot.docs.length);
       } catch (error) {
@@ -171,28 +166,24 @@ export default function UserProfile() {
 
   /**
    * 6) Follow / Unfollow:
-   *    - We update BOTH the target user's doc (followers/followersCount)
-   *      AND the current user's doc (following/followingCount) in one batch.
+   *    - We update BOTH the target user's doc (followers)
+   *      AND the current user's doc (following).
    */
   const handleFollowToggle = async () => {
     if (!userData?.docId) return;
     if (!currentUserDocId) return;
 
     try {
-      const batch = writeBatch(db);
-
       const targetUserRef = doc(db, "users", userData.docId);
       const currentUserRef = doc(db, "users", currentUserDocId);
 
       if (isFollowing) {
         // UNFOLLOW: Remove current user from target's followers and target from current user's following
-        batch.update(targetUserRef, {
-          followers: arrayRemove(currentUser.uid),
-          followersCount: increment(-1),
+        await updateDoc(targetUserRef, {
+          followers: arrayRemove(currentUserDocId),
         });
-        batch.update(currentUserRef, {
-          following: arrayRemove(userData.uid),
-          followingCount: increment(-1),
+        await updateDoc(currentUserRef, {
+          following: arrayRemove(userData.docId),
         });
 
         // Update local UI states
@@ -200,21 +191,17 @@ export default function UserProfile() {
         setFollowersCount((prev) => prev - 1);
       } else {
         // FOLLOW: Add current user to target's followers and target to current user's following
-        batch.update(targetUserRef, {
-          followers: arrayUnion(currentUser.uid),
-          followersCount: increment(1),
+        await updateDoc(targetUserRef, {
+          followers: arrayUnion(currentUserDocId),
         });
-        batch.update(currentUserRef, {
-          following: arrayUnion(userData.uid),
-          followingCount: increment(1),
+        await updateDoc(currentUserRef, {
+          following: arrayUnion(userData.docId),
         });
 
         // Update local UI states
         setIsFollowing(true);
         setFollowersCount((prev) => prev + 1);
       }
-
-      await batch.commit();
     } catch (error) {
       Alert.alert("Error", "Something went wrong while updating follow status.");
       console.error(error);
@@ -225,14 +212,14 @@ export default function UserProfile() {
    * 7) Message button logic
    */
   const handleMessage = () => {
-    if (!userData?.uid || !currentUser) {
+    if (!userData?.docId || !currentUser) {
       Alert.alert('Error', 'Cannot start chat at this time');
       return;
     }
     // Use the correct path format for Expo Router
     router.push({
       pathname: '/messages',
-      params: { recipientId: userData.uid }
+      params: { recipientId: userData.docId }
     });
   };
 
@@ -296,8 +283,15 @@ export default function UserProfile() {
 
       {/* Buttons Row */}
       <View style={styles.buttonsRow}>
-        <TouchableOpacity style={styles.button} onPress={handleFollowToggle}>
-          <Text style={styles.buttonText}>
+        <TouchableOpacity
+          style={[
+            styles.baseFollowButton,
+            isFollowing && styles.followingButton,
+            !isFollowing && styles.notFollowingButton,
+          ]}
+          onPress={handleFollowToggle}
+        >
+          <Text style={styles.followButtonText}>
             {isFollowing ? "Following" : "Follow"}
           </Text>
         </TouchableOpacity>
@@ -363,6 +357,22 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     marginVertical: 10,
     alignItems: "center",
+  },
+  baseFollowButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+  },
+  followingButton: {
+    backgroundColor: "#aaa",
+  },
+  notFollowingButton: {
+    backgroundColor: "#007bff",
+  },
+  followButtonText: {
+    color: "#fff",
+    fontWeight: "600",
+    fontSize: 16,
   },
   button: {
     backgroundColor: "#007AFF",

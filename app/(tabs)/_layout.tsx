@@ -63,6 +63,7 @@ export default function TabLayout() {
       <TrendsIcon width={24} height={24} fill={color} />
     ),
   }}
+  
 />
       <Tabs.Screen
         name="user"
