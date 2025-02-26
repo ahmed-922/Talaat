@@ -35,6 +35,7 @@ import Likesfill from "./svgs/likesfill";
 import Comments from "./svgs/comments";
 import Share from "./svgs/share";
 
+
 // --- Helper Functions for Timestamp Formatting ---
 
 function timeAgo(date: Date) {
@@ -600,6 +601,7 @@ function PostItem({ post }: { post: any }) {
 // --- Styles ---
 
 const styles = StyleSheet.create({
+ 
   container: {
     flex: 1,
     backgroundColor: "#fff",

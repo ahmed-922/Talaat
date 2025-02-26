@@ -1,0 +1,18 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "posts",
+      "fields": [
+        { "fieldPath": "byUser", "mode": "ASCENDING" },
+        { "fieldPath": "createdAt", "mode": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "videos",
+      "fields": [
+        { "fieldPath": "byUser", "mode": "ASCENDING" },
+        { "fieldPath": "createdAt", "mode": "DESCENDING" }
+      ]
+    }
+  ]
+}

@@ -5,6 +5,7 @@ import { useRouter } from 'expo-router';
 import { getAuth, onAuthStateChanged } from '@firebase/auth';
 import Header from '../../components/header';
 import Media from '../../components/media';
+import Stories from '../../components/stories';
 
 const SplashScreen = ({ onAuthCheckComplete }: { onAuthCheckComplete: () => void }) => {
   const router = useRouter();
@@ -53,13 +54,17 @@ export default function Home() {
     return <SplashScreen onAuthCheckComplete={() => setLoading(false)} />;
   }
 
+
   return (
-    <View style={{ flex: 1, backgroundColor: 'white' }}>
+    
+    <View style={{ flex: 1, backgroundColor: "white", }}>
       {/* Fixed Header at the Top */}
       <Header />
-
+      {/* Stories */}
+      <Stories  />  
       {/* Main Content Below the Header */}
       <View style={{ flex: 1 }}>
+      
         <Media />
       </View>
     </View>

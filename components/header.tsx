@@ -25,7 +25,7 @@ export default function Header() {
 const styles = StyleSheet.create({
   header: {
     height: 70,
-    backgroundColor: '#fff',
+    backgroundColor: 'white',
     borderBottomWidth: 1,
     borderBottomColor: '#ccc',
     justifyContent: 'space-between',
