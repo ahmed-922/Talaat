@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, Image, TouchableOpacity, StyleSheet, useColorScheme } from 'react-native';
-import { collection, doc, getDoc } from 'firebase/firestore';
+import { View, Text, Image, TouchableOpacity, StyleSheet, useColorScheme, FlatList } from 'react-native';
+import { collection, doc, getDoc, query, where, getDocs } from 'firebase/firestore';
 import { db, auth } from '../../firebaseConfig';
 import { onAuthStateChanged } from 'firebase/auth';
 import { Link } from 'expo-router';
@@ -12,7 +12,7 @@ export default function UserProfile() {
   const [name, setName] = useState('');
   const [profilePicture, setProfilePicture] = useState('');
   const [bio, setBio] = useState('');
-  const [postsCount, setPostsCount] = useState(0);
+  const [posts, setPosts] = useState([]);
   const [followersCount, setFollowersCount] = useState(0);
   const [followingCount, setFollowingCount] = useState(0);
   const colorScheme = useColorScheme();
@@ -22,6 +22,7 @@ export default function UserProfile() {
       if (currentUser) {
         setUser(currentUser);
         fetchUserProfile(currentUser.uid); // Fetch user profile directly using UID
+        fetchUserPosts(currentUser.uid); // Fetch user posts directly using UID
       } else {
         console.log("User is not logged in");
       }
@@ -51,15 +52,15 @@ export default function UserProfile() {
     }
   };
 
-
-  
-  const fetchUserPostsCount = async (uid) => {
+  // Fetch the user posts from Firestore if document ID matches currentUser.uid
+  const fetchUserPosts = async (userId) => {
     try {
-      const postsQuery = query(collection(db, 'posts'), where('byUser', '==', uid));
+      const postsQuery = query(collection(db, 'posts'), where('userId', '==', userId));
       const postsSnapshot = await getDocs(postsQuery);
-      setPostsCount(postsSnapshot.docs.length);
+      const postsData = postsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setPosts(postsData);
     } catch (error) {
-      console.error("Error fetching posts count:", error);
+      console.error("Error fetching posts:", error);
     }
   };
 
@@ -100,7 +101,7 @@ export default function UserProfile() {
             {/* Centered Stats */}
             <View style={styles.statsContainer}>
               <View style={styles.statContainer}>
-                <Text style={[styles.statCount, themeTextStyle]}>{postsCount}</Text>
+                <Text style={[styles.statCount, themeTextStyle]}>{posts.length}</Text>
                 <Text style={[styles.statLabel, themeTextStyle]}>Posts</Text>
               </View>
               <View style={styles.statContainer}>
@@ -143,11 +144,19 @@ export default function UserProfile() {
           </View>
 
           <Text style={[styles.sectionLabel, themeTextStyle, styles.centerText]}>Posts</Text>
-          <Text style={[themeTextStyle, styles.centerText]}>
-            {postsCount > 0
-              ? `You have ${postsCount} post${postsCount > 1 ? 's' : ''}`
-              : 'There are no Posts'}
-          </Text>
+          <FlatList
+            data={posts}
+            renderItem={({ item }) => (
+              <Link href={`../(pages)/post?id=${item.id}`} asChild>
+                <TouchableOpacity style={styles.postItem}>
+                  <Image source={{ uri: item.mediaUrl }} style={styles.postImage} />
+                </TouchableOpacity>
+              </Link>
+            )}
+            keyExtractor={(item) => item.id}
+            numColumns={3}
+            contentContainerStyle={styles.postsContainer}
+          />
         </View>
       )}
     </View>
@@ -264,5 +273,17 @@ const styles = StyleSheet.create({
   },
   centerText: {
     textAlign: 'center',
+  },
+  postsContainer: {
+    paddingVertical: 20,
+  },
+  postItem: {
+    flex: 1,
+    margin: 5,
+    aspectRatio: 1,
+  },
+  postImage: {
+    width: '100%',
+    height: '100%',
   },
 });

@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Button, StyleSheet, Text, TouchableOpacity, View, Image } from 'react-native';
 import * as ImagePicker from "expo-image-picker";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { db, auth } from "../../firebaseConfig";
 
 export default function AddStory() {
@@ -36,9 +37,18 @@ export default function AddStory() {
     if (!image || !currentUser) return;
 
     try {
+      // Upload image to Firebase Storage
+      const response = await fetch(image);
+      const blob = await response.blob();
+      const storage = getStorage();
+      const storageRef = ref(storage, `stories/${currentUser.uid}/${Date.now()}`);
+      await uploadBytes(storageRef, blob);
+      const imageUrl = await getDownloadURL(storageRef);
+
+      // Save story to Firestore
       await addDoc(collection(db, "stories"), {
         userId: currentUser.uid,
-        imageUrl: image,
+        imageUrl: imageUrl,
         createdAt: serverTimestamp(),
       });
       alert("Story added successfully!");

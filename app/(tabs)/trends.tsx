@@ -240,11 +240,11 @@ const VideoItem = ({ item, isVisible, playerRef }: { item: any, isVisible: boole
 
   // Fetch uploader data
   useEffect(() => {
-    if (!item.byUser) return;
+    if (!item.userId) return;
 
     const fetchUploaderData = async () => {
       try {
-        const userRef = doc(db, 'users', item.byUser);
+        const userRef = doc(db, 'users', item.userId);
         const userSnap = await getDoc(userRef);
         if (userSnap.exists()) {
           const userData = userSnap.data();
@@ -257,7 +257,7 @@ const VideoItem = ({ item, isVisible, playerRef }: { item: any, isVisible: boole
     };
 
     fetchUploaderData();
-  }, [item.byUser]);
+  }, [item.userId]);
 
   // Fetch video date, caption, and extra text
   useEffect(() => {
@@ -430,8 +430,8 @@ const VideoItem = ({ item, isVisible, playerRef }: { item: any, isVisible: boole
       <View style={styles.socialButtons}>
       
         {/* User Profile Button */}
-        {item.byUser && (
-                <Link href={`/UserProfile?uid=${item.byUser}`} asChild>
+        {item.userId && (
+                <Link href={`/UserProfile?uid=${item.userId}`} asChild>
                    <TouchableOpacity onPress={handleLike} style={styles.socialButton}>
                     <Image
                       source={{ 
@@ -527,7 +527,7 @@ const VideoItem = ({ item, isVisible, playerRef }: { item: any, isVisible: boole
 interface VideoData {
   id: string;
   mediaUrl: string;
-  byUser?: string;
+  userId?: string;
   likes?: string[];
   [key: string]: any;
 }

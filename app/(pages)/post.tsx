@@ -13,8 +13,8 @@ import { Share } from "react-native";
 interface PostData {
   id: string;
   caption?: string;
-  img?: string;
-  byUser?: string;
+  mediaUrl?: string;
+  userId?: string;
   likes?: string[];
   createdAt?: {
     seconds: number;
@@ -200,9 +200,9 @@ export default function Post() {
   const currentUser = auth.currentUser;
   
   // Use custom hooks to fetch user data
-  const authorUsername = useUsername(post?.byUser);
-  const authorProfilePicture = useProfilePicture(post?.byUser);
-  const isFollowing = useIsFollowing(currentUser?.uid, post?.byUser);
+  const authorUsername = useUsername(post?.userId);
+  const authorProfilePicture = useProfilePicture(post?.userId);
+  const isFollowing = useIsFollowing(currentUser?.uid, post?.userId);
   
   // Log when isFollowing changes
   useEffect(() => {
@@ -291,12 +291,12 @@ export default function Post() {
   };
 
   const handleShare = async () => {
-    if (!post || !post.img) return;
+    if (!post || !post.mediaUrl) return;
     
     try {
       await Share.share({
         message: `Check out this post!`,
-        url: post.img
+        url: post.mediaUrl
       });
     } catch (error) {
       console.error('Error sharing post:', error);
@@ -304,7 +304,7 @@ export default function Post() {
   };
 
   const handleFollow = async () => {
-    if (!currentUser || !post?.byUser) {
+    if (!currentUser || !post?.userId) {
       console.log("Cannot follow: missing current user or post author");
       return;
     }
@@ -317,13 +317,13 @@ export default function Post() {
     
     // Otherwise, follow the user
     try {
-      console.log(`Following user: ${post.byUser}`);
+      console.log(`Following user: ${post.userId}`);
       const currentUserRef = doc(db, "users", currentUser.uid);
-      const targetUserRef = doc(db, "users", post.byUser);
+      const targetUserRef = doc(db, "users", post.userId);
       
       // Follow user
       await updateDoc(currentUserRef, {
-        following: arrayUnion(post.byUser)
+        following: arrayUnion(post.userId)
       });
       
       await updateDoc(targetUserRef, {
@@ -338,19 +338,19 @@ export default function Post() {
   };
   
   const handleUnfollow = async () => {
-    if (!currentUser || !post?.byUser) {
+    if (!currentUser || !post?.userId) {
       console.log("Cannot unfollow: missing current user or post author");
       return;
     }
     
     try {
-      console.log(`Unfollowing user: ${post.byUser}`);
+      console.log(`Unfollowing user: ${post.userId}`);
       const currentUserRef = doc(db, "users", currentUser.uid);
-      const targetUserRef = doc(db, "users", post.byUser);
+      const targetUserRef = doc(db, "users", post.userId);
       
       // Unfollow user
       await updateDoc(currentUserRef, {
-        following: arrayRemove(post.byUser)
+        following: arrayRemove(post.userId)
       });
       
       await updateDoc(targetUserRef, {
@@ -366,8 +366,8 @@ export default function Post() {
   };
 
   const navigateToUserProfile = () => {
-    if (post && post.byUser) {
-      router.push(`/UserProfile?uid=${post.byUser}`);
+    if (post && post.userId) {
+      router.push(`/UserProfile?uid=${post.userId}`);
     }
   };
 
@@ -390,7 +390,7 @@ export default function Post() {
   return (
     <ScrollView style={styles.container}>
       {/* User Profile Section */}
-      {post.byUser && (
+      {post.userId && (
         <View style={styles.userContainer}>
           <View style={styles.userProfileRow}>
             {/* Profile picture and username container */}
@@ -410,7 +410,7 @@ export default function Post() {
             </View>
             
             {/* Follow Button - positioned to the right */}
-            {currentUser && currentUser.uid !== post.byUser && (
+            {currentUser && currentUser.uid !== post.userId && (
               <TouchableOpacity 
                 onPress={handleFollow}
                 style={[
@@ -431,8 +431,8 @@ export default function Post() {
       )}
 
       {/* Post Content */}
-      {post.img && (
-        <Image source={{ uri: post.img }} style={styles.postImage} />
+      {post.mediaUrl && (
+        <Image source={{ uri: post.mediaUrl }} style={styles.postImage} />
       )}
       
       {/* Social Interaction Buttons */}

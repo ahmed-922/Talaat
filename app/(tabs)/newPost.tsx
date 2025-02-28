@@ -1,237 +1,131 @@
-import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  TextInput,
-  StyleSheet,
-  Image,
-  ScrollView,
-  SafeAreaView,
-  Button,
-  Alert,
-} from 'react-native';
-import { useRouter } from 'expo-router';
-import * as ImagePicker from 'expo-image-picker';
-import { collection, addDoc } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { db, storage, auth } from '../../firebaseConfig'; // adjust path as needed
+import { CameraView, CameraType, useCameraPermissions } from 'expo-camera';
+import { useState } from 'react';
+import { Button, StyleSheet, Text, TouchableOpacity, View, Image } from 'react-native';
+import * as ImagePicker from "expo-image-picker";
+import { useRouter } from "expo-router";
+import { useIsFocused } from "@react-navigation/native"; // ✅ Added for page focus tracking
+import CameraIcon from '../../components/svgs/camera';
+import FlipcameraIcon from '../../components/svgs/flipCamera';
+import GallaryIcon from '../../components/svgs/gallary';
 
-// Define an interface for the asset (image or video)
-interface Asset {
-  uri: string;
-  type: 'image' | 'video';
-}
-
-export default function NewPostScreen() {
+export default function NewPost() {
+  const [facing, setFacing] = useState<CameraType>('back');
+  const [permission, requestPermission] = useCameraPermissions();
+  const [cameraRef, setCameraRef] = useState<CameraView | null>(null);
+  const [media, setMedia] = useState<string | null>(null);
   const router = useRouter();
-  const [caption, setCaption] = useState('');
-  const [extraText, setExtraText] = useState('');
-  // Now store the picked asset (which may be an image or a video)
-  const [asset, setAsset] = useState<Asset | null>(null);
-  const currentUser = auth.currentUser;
+  const isFocused = useIsFocused();
 
-  const pickAsset = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      alert('Permission to access camera roll is required!');
-      return;
+  const takePicture = async () => {
+    if (cameraRef) {
+      const photo = await cameraRef.takePictureAsync();
+      setMedia(photo.uri);
+      router.push({
+        pathname: "/upload",
+        params: { uri: photo.uri, type: "image" },
+      });
+      setMedia(null);
     }
+  };
 
+  const pickMedia = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.All, // Accept both images and videos
+      mediaTypes: ImagePicker.MediaTypeOptions.All,
       allowsEditing: true,
       aspect: [4, 3],
       quality: 1,
     });
 
     if (!result.canceled) {
-      const pickedAsset = result.assets[0];
-      // Determine asset type (fallback to checking file extension if not provided)
-      const assetType =
-        pickedAsset.type ||
-        (pickedAsset.uri.match(/\.(mp4|mov)$/i) ? 'video' : 'image');
-      setAsset({ uri: pickedAsset.uri, type: assetType as 'image' | 'video' });
+      const selectedMedia = result.assets[0];
+      setMedia(selectedMedia.uri);
+
+      router.push({
+        pathname: "/upload",
+        params: { uri: selectedMedia.uri, type: selectedMedia.type },
+      });
+      setMedia(null);
     }
   };
 
-  const handlePost = async () => {
-    // Validate that at least one of the text inputs is non-empty
-    if (!caption.trim() && !extraText.trim()) {
-      Alert.alert('Error', 'Please add either a caption or extra text before posting.');
-      return;
-    }
+  if (!permission) {
+    return <View />;
+  }
 
-    try {
-      let downloadURL = '';
+  if (!permission.granted) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.message}>We need your permission to show the camera</Text>
+        <Button onPress={requestPermission} title="Grant Permission" />
+      </View>
+    );
+  }
 
-      if (asset) {
-        const response = await fetch(asset.uri);
-        const blob = await response.blob();
-
-        // Choose the storage path based on asset type
-        const storagePath =
-          asset.type === 'video'
-            ? `videos/${Date.now()}.mp4`
-            : `photos/${Date.now()}.jpg`;
-        const storageRef = ref(storage, storagePath);
-
-        await uploadBytes(storageRef, blob);
-        downloadURL = await getDownloadURL(storageRef);
-      }
-
-      // Choose the Firestore collection based on asset type:
-      // If asset is a video, add to 'videos' collection; otherwise, 'posts'
-      const collectionName =
-        asset && asset.type === 'video' ? 'videos' : 'posts';
-
-      const postData = {
-        byUser: currentUser?.uid || 'anonymous',
-        caption,
-        extraText,
-        likes: [],
-        createdAt: new Date(),
-      };
-
-      // Save the URL under a specific key based on asset type
-      if (asset) {
-        if (asset.type === 'video') {
-          postData.mediaUrl = downloadURL;
-          postData.mediaType = 'video';
-        } else {
-          postData.img = downloadURL;
-        }
-      }
-
-      await addDoc(collection(db, collectionName), postData);
-
-      // Reset fields
-      setCaption('');
-      setExtraText('');
-      setAsset(null);
-
-      Alert.alert('Post Created', 'Your post has been successfully created.', [
-        {
-          text: 'OK',
-          onPress: () => {
-            router.push('/');
-          },
-        },
-      ]);
-    } catch (error) {
-      console.error('Error adding post:', error);
-    }
-  };
+  function toggleCameraFacing() {
+    setFacing((current) => (current === 'back' ? 'front' : 'back'));
+  }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <ScrollView style={styles.scrollContainer}>
-        <View style={styles.userRow}>
-          <Image
-            source={{ uri: 'https://via.placeholder.com/40' }}
-            style={styles.avatar}
+    <View style={styles.container}>
+      {media ? (
+        <Image source={{ uri: media }} style={styles.preview} />
+      ) : (
+        isFocused && ( 
+          <CameraView
+            style={styles.camera}
+            type={facing}
+            ref={(ref) => setCameraRef(ref)}
           />
-        </View>
+        )
+      )}
 
-        {/* Render a preview if the asset is an image */}
-        {asset && asset.type === 'image' && (
-          <Image source={{ uri: asset.uri }} style={styles.previewImage} />
-        )}
-        {/* For video, you might later add a video preview component */}
-        {asset && asset.type === 'video' && (
-          <Text style={styles.videoInfo}>Video Selected</Text>
-        )}
-
-        <TouchableOpacity onPress={pickAsset}>
-          <Text style={styles.addImageText}>Add image or video</Text>
+      <View style={styles.controls}>
+        <TouchableOpacity onPress={toggleCameraFacing}>
+          <FlipcameraIcon fill='white' width={32} height={32}  />
         </TouchableOpacity>
 
-        <TextInput
-          style={styles.inputCaption}
-          placeholder="What's new?"
-          placeholderTextColor="#888"
-          value={caption}
-          onChangeText={setCaption}
-          maxLength={20}
-        />
+        <TouchableOpacity onPress={takePicture}>
+          <CameraIcon fill='white' width={32} height={32} />
+        </TouchableOpacity>
 
-        {/* Extra Text Input */}
-        <TextInput
-          style={styles.inputExtra}
-          placeholder="Say more..."
-          placeholderTextColor="#888"
-          multiline
-          value={extraText}
-          onChangeText={setExtraText}
-        />
-
-        <Text style={styles.replyInfo}>Anyone can reply & quote</Text>
-        <View style={styles.postButtonRow}>
-          <Button title="Post" onPress={handlePost} />
-        </View>
-      </ScrollView>
-    </SafeAreaView>
+        <TouchableOpacity onPress={pickMedia}>
+          <GallaryIcon fill='white' width={32} height={32} />
+        </TouchableOpacity>
+      </View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
+  container: {
     flex: 1,
-  },
-  scrollContainer: {
-    flex: 1,
-    padding: 16,
-  },
-  userRow: {
-    flexDirection: 'row',
+    justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 16,
+    backgroundColor: '#000',
   },
-  avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    marginRight: 8,
-  },
-  previewImage: {
+  camera: {
+    flex: 1,
     width: '100%',
-    height: 200,
-    resizeMode: 'cover',
-    borderRadius: 8,
-    marginBottom: 16,
   },
-  videoInfo: {
-    fontSize: 16,
-    marginBottom: 16,
-    color: '#555',
+  preview: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
   },
-  addImageText: {
-    color: '#007AFF',
-    marginBottom: 16,
+  controls: {
+    position: 'absolute',
+    bottom: 50,
+    flexDirection: 'row',
+    width: '100%',
+    justifyContent: 'space-around',
+    backgroundColor: 'blue',
+    height: 50,
+    alignContent: 'center',
+    alignItems: 'center',
   },
-  inputCaption: {
-    borderBottomWidth: 1,
-    borderBottomColor: '#444',
-    color: 'black',
-    paddingVertical: 4,
-    marginBottom: 16,
-  },
-  inputExtra: {
-    borderWidth: 1,
-    borderColor: '#444',
-    borderRadius: 8,
-    color: 'black',
-    padding: 8,
-    textAlignVertical: 'top',
-    minHeight: 80,
-    marginBottom: 16,
-  },
-  replyInfo: {
-    color: '#888',
-    marginTop: 8,
-  },
-  postButtonRow: {
-    padding: 16,
-    alignItems: 'flex-end',
+  message: {
+    color: '#fff',
+    textAlign: 'center',
+    marginBottom: 10,
   },
 });

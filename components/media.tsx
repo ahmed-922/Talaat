@@ -12,6 +12,7 @@ import {
   Share as RNShare,
   PanResponder,
   Animated,
+  Alert,
 } from "react-native";
 import {
   collection,
@@ -27,6 +28,7 @@ import {
   where,
   getDoc,
   orderBy,
+  deleteDoc,
 } from "firebase/firestore";
 import { db, auth } from "../firebaseConfig";
 import { Link } from "expo-router"; // Import Link for navigation
@@ -220,8 +222,8 @@ function PostItem({ post }: { post: any }) {
   }, [post.id]);
 
   // Fetch the author's username and profile picture using custom hooks.
-  const authorUsername = useUsername(localPost.byUser);
-  const authorProfilePicture = useProfilePicture(localPost.byUser);
+  const authorUsername = useUsername(localPost.userId);
+  const authorProfilePicture = useProfilePicture(localPost.userId);
 
   // Check if the current user has liked the post.
   const alreadyLiked = localPost.likes?.includes(userUID);
@@ -375,11 +377,54 @@ function PostItem({ post }: { post: any }) {
     try {
       await RNShare.share({
         message: `Check out this post: ${localPost.caption}`,
-        url: localPost.img,
+        url: localPost.mediaUrl,
       });
       setShareModalVisible(false);
     } catch (error) {
       console.error("Error sharing post:", error);
+    }
+  };
+
+  // Handle deleting the post with confirmation
+  const handleDeletePost = async () => {
+    Alert.alert(
+      "Delete Post",
+      "Are you sure you want to delete this post?",
+      [
+        {
+          text: "Cancel",
+          style: "cancel",
+        },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await deleteDoc(doc(db, "posts", localPost.id));
+              alert("Post deleted successfully!");
+              closeModal();
+            } catch (error) {
+              console.error("Error deleting post:", error);
+            }
+          },
+        },
+      ],
+      { cancelable: true }
+    );
+  };
+
+  // Handle reporting the post
+  const handleReportPost = async () => {
+    try {
+      await setDoc(doc(db, "reports", localPost.id), {
+        postId: localPost.id,
+        reportedBy: userUID,
+        createdAt: serverTimestamp(),
+      });
+      alert("Post reported successfully!");
+      closeModal();
+    } catch (error) {
+      console.error("Error reporting post:", error);
     }
   };
 
@@ -441,6 +486,8 @@ function PostItem({ post }: { post: any }) {
       setIsClosing(false);
     }, 200); // Match the duration of the slide-down animation
   };
+
+  
   
 
   
@@ -448,7 +495,7 @@ function PostItem({ post }: { post: any }) {
     <View style={styles.postContainer}>
       {/* Top Bar: Clickable user info wrapped in a Link */}
       <View style={styles.topBar}>
-        <Link href={`../(pages)/UserProfile?uid=${localPost.byUser}`} style={styles.Unp}>
+        <Link href={`../(pages)/UserProfile?uid=${localPost.userId}`} style={styles.Unp}>
           <View style={{ flexDirection: "row", alignItems: "center" }}>
             <Image source={{ uri: authorProfilePicture || '../photos/defaultpfp.png'  }} style={styles.userPhoto} resizeMode="contain" />
             <Text style={styles.usernameText}>{authorUsername}</Text>
@@ -463,8 +510,8 @@ function PostItem({ post }: { post: any }) {
       <Link href={`../(pages)/post?id=${post.id}`} asChild>
         <TouchableOpacity>
           {/* Post image */}
-          {localPost.img ? (
-            <Image source={{ uri: localPost.img }} style={styles.postImage} />
+          {localPost.mediaUrl ? (
+            <Image source={{ uri: localPost.mediaUrl }} style={styles.postImage} />
           ) : null}
 
           {/* Timestamp */}
@@ -577,16 +624,13 @@ function PostItem({ post }: { post: any }) {
 
             {optionsModalVisible && (
               <View style={styles.modalContent}>
-                {userUID === localPost.byUser && (
-                  <TouchableOpacity style={styles.optionItem}>
-                    <Text>Delete Post (not implemented)</Text>
+                {userUID === localPost.userId && (
+                  <TouchableOpacity style={styles.optionItem} onPress={handleDeletePost}>
+                    <Text style={styles.deleteText}>Delete Post</Text>
                   </TouchableOpacity>
                 )}
-                <TouchableOpacity style={styles.optionItem}>
-                  <Text>Report Post (not implemented)</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.optionItem}>
-                  <Text>Copy Link (not implemented)</Text>
+                <TouchableOpacity style={styles.optionItem} onPress={handleReportPost}>
+                  <Text>Report Post</Text>
                 </TouchableOpacity>
                 <Button title="Close" onPress={closeModal} color="red" />
               </View>
@@ -800,5 +844,8 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     marginVertical: 8,
     opacity: 0.8, // Slightly transparent for better visual feedback
+  },
+  deleteText: {
+    color: "red",
   },
 });

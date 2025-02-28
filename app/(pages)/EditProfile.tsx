@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   StyleSheet,
   Image,
-  Modal,
   useColorScheme,
   Alert,
 } from 'react-native';
@@ -23,8 +22,8 @@ import { db, auth } from '../../firebaseConfig';
 import { onAuthStateChanged } from 'firebase/auth';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import Upload from '../../components/upload';
 import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import * as ImagePicker from 'expo-image-picker';
 
 export default function EditProfile() {
   const [user, setUser] = useState<any>(null);
@@ -32,7 +31,6 @@ export default function EditProfile() {
   const [name, setName] = useState('');
   const [bio, setBio] = useState('');
   const [profilePicture, setProfilePicture] = useState('');
-  const [showUpload, setShowUpload] = useState(false);
   const colorScheme = useColorScheme();
   const router = useRouter();
 
@@ -89,6 +87,19 @@ export default function EditProfile() {
     }
   };
 
+  const pickImage = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [4, 3],
+      quality: 1,
+    });
+
+    if (!result.canceled) {
+      await handleImageUpload(result.assets[0].uri);
+    }
+  };
+
   const handleSave = async () => {
     if (!user) return;
 
@@ -126,7 +137,7 @@ export default function EditProfile() {
       <Text style={styles.label}>Edit Profile</Text>
 
       <View style={styles.imageContainer}>
-        <TouchableOpacity onPress={() => setShowUpload(true)}>
+        <TouchableOpacity onPress={pickImage}>
           {profilePicture ? (
             <Image source={{ uri: profilePicture }} style={styles.profileImage} />
           ) : (
@@ -169,25 +180,6 @@ export default function EditProfile() {
       <TouchableOpacity style={styles.button} onPress={handleSave}>
         <Text style={styles.buttonText}>Save</Text>
       </TouchableOpacity>
-
-      <Modal visible={showUpload} transparent animationType="slide">
-        <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
-            <Upload
-              onImagePicked={async (uri) => {
-                await handleImageUpload(uri);
-                setShowUpload(false);
-              }}
-            />
-            <TouchableOpacity
-              style={styles.closeButton}
-              onPress={() => setShowUpload(false)}
-            >
-              <Text style={styles.buttonText}>Close</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
     </View>
   );
 }
@@ -259,24 +251,5 @@ const styles = StyleSheet.create({
   buttonText: {
     color: '#fff',
     fontWeight: 'bold',
-  },
-  modalContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-  },
-  modalContent: {
-    width: '80%',
-    backgroundColor: '#fff',
-    padding: 20,
-    borderRadius: 10,
-  },
-  closeButton: {
-    backgroundColor: '#007AFF',
-    padding: 10,
-    borderRadius: 5,
-    alignItems: 'center',
-    marginTop: 10,
   },
 });
